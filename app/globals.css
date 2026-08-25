@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Dark is the primary theme and lives on :root. The root element always carries
+   an explicit `dark` or `light` class so the `dark:` variant stays usable. */
+:root {
+  --bg: #0b0f16;
+  --surface: #121822;
+  --surface-2: #19202b;
+  --surface-3: #212a37;
+
+  --line: #273140;
+  --line-strong: #33404f;
+
+  --ink: #e8ecf2;
+  --ink-2: #93a0b1;
+  --ink-3: #78838f;
+
+  --accent: #5b84f5;
+  --accent-hover: #7899f7;
+  --accent-soft: #1a2846;
+  --accent-contrast: #06101f;
+
+  --ember: #f08a4b;
+  --ember-soft: #33200f;
+
+  --flag: #d9ba4a;
+  --flag-soft: #2b2411;
+
+  --overlay: rgb(4 8 14 / 0.72);
+  --shadow-overlay: 0 24px 64px -12px rgb(3 6 12 / 0.72);
+
+  --paper-line: rgb(91 132 245 / 0.05);
+}
+
+.light {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f3f7;
+  --surface-3: #e8ebf1;
+
+  --line: #dfe3ea;
+  --line-strong: #c6ccd8;
+
+  --ink: #111823;
+  --ink-2: #5a6675;
+  --ink-3: #666f7b;
+
+  --accent: #2c5be8;
+  --accent-hover: #1f47c4;
+  --accent-soft: #e6ecfd;
+  --accent-contrast: #ffffff;
+
+  --ember: #c2510f;
+  --ember-soft: #fcede2;
+
+  --flag: #7a6414;
+  --flag-soft: #fbf3d8;
+
+  --overlay: rgb(17 24 35 / 0.4);
+  --shadow-overlay: 0 24px 64px -12px rgb(17 24 35 / 0.18);
+
+  --paper-line: rgb(44 91 232 / 0.05);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+
+  --color-ember: var(--ember);
+  --color-ember-soft: var(--ember-soft);
+
+  --color-flag: var(--flag);
+  --color-flag-soft: var(--flag-soft);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Shape lock: surfaces 12, controls 8, micro-elements 4, chips pill.
+     Four tiers, no exceptions. */
+  --radius-surface: 12px;
+  --radius-control: 8px;
+  --radius-micro: 4px;
+
+  --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Z-index scale. These are the only layers in the app; do not invent others.
+   10 sticky top bar - 20 mobile tab bar - 30 sheets - 40 dialogs - 50 toasts */
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  html.light {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Numbers must never shift width as they update. */
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  * {
+    scrollbar-color: var(--line-strong) transparent;
+  }
+}
+
+/* Display face. Declared as a utility rather than a theme font so it can carry
+   its optical-size axis and tracking in one class. */
+@utility font-display {
+  font-family: var(--font-bricolage), var(--font-geist-sans), sans-serif;
+  font-variation-settings: "opsz" 40;
+  letter-spacing: -0.02em;
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Engineering-notebook substrate. Only ever applied to non-scrolling backdrops
+   and empty states, never to scrolling containers. */
+@utility grid-paper {
+  background-image:
+    linear-gradient(to right, var(--paper-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--paper-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
