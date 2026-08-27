@@ -196,8 +196,12 @@ display. Without it, "Where it goes wrong" ignores everything you actually mark.
 
 - `flagProblem(id, flagged)` so a flag survives navigation and keeps the problem
   in the queue.
-- Require an error kind before advancing from a miss — the UI already asks for
-  it, it is simply discarded.
+- **Amended by `ENGAGEMENT_ANALYSIS.md` §5.3 — do not hard-require the error
+  kind inline.** The original plan was to gate advance on classifying a miss.
+  Instead: keep it one-tap and optional inline, let `Enter` advance without it,
+  and batch anything unclassified into the session recap (engagement item #10
+  below) where the user is reflective rather than mid-recovery from a miss.
+  Same data, no flow cost.
 - Route Skip through `submitAnswer` with an empty answer so it records a
   `skipped` attempt.
 - Derive `Problem.status` from attempts (flagged wins; else latest scored
@@ -249,6 +253,47 @@ untested and will first be seen by a real new user.*
 - `hasActiveFilters` / the filters' `anyActive` check counts *any* search param;
   scope both to `QUEUE_KEYS` so an unrelated param never reads as a filter.
 - Resolve the mock-clock split described under Risks.
+
+---
+
+## 3a. Engagement phase — from `ENGAGEMENT_ANALYSIS.md`
+
+Full reasoning and citations for each item live in `ENGAGEMENT_ANALYSIS.md`
+(written 2026-08-26 from a read of the shipped components, not the README).
+This is the top-10 list from that document, sequenced against the plan above.
+Two structural findings drove it: every form of user investment (attempts,
+flags, error-kind self-diagnosis, notes) currently evaporates because nothing
+persists, and the app has no emotional peak or ending, so a well-crafted
+experience reads as flat in retrospect. Gamification mechanics that would
+contradict the product's "diagnostic, not trophy case" philosophy (XP, levels,
+badges, leaderboards, streak-shaming) were explicitly considered and rejected.
+
+**Independent of persistence — buildable now, against mock data:**
+
+| # | Change | Effort | Rationale |
+| --- | --- | --- | --- |
+| 1 | Zero-decision start path: an always-enabled "Start where I left off" above the filter panel; demote filters to "or choose what to work on" | ~30 min | The no-filter path already works (`lib/queue.ts:86`); nothing tells the user. Removes a configuration decision from the front of every session. |
+| 2 | Surface `queuedCount` on the dashboard | ~15 min | `getDashboard()` already computes it (`lib/mock/api.ts:278`) and it is rendered nowhere. Goal-gradient signal already paid for. |
+| 3 | Name the spoiler rule in the UI, once, near the citation on solve | ~15 min | The product's differentiator is documented only in the README. Invisible features read as missing metadata, not deliberate pedagogy. |
+| 4 | Three copy fixes: `feedback.tsx:86`, `upload-panel.tsx:110`, `:111` | ~15 min | The only three places copy slips into product/engineering vocabulary instead of speaking to the student. |
+| 5 | Streak visible on mobile — `top-bar.tsx:24` is `hidden ... lg:flex` | ~10 min | The only persistent retention artifact is currently desktop-only. |
+| 6 | Stage the feedback reveal (outcome → answer → classification, ~120ms stagger) and mark a correct difficulty 4–5 answer distinctly (accent border, firmer spring) | ~1–2 h | Creates the app's only emotional peak. The classification reveal is the one genuine variable reward and currently renders as a flat metadata footer. |
+| 8 | Timer hide toggle, persisted next to `margin-solve-split` | ~45 min | Keep recording elapsed time; make displaying it optional. A count-up clock with no reference point can only make the user feel slow, and blocks flow on hard problems. |
+| 9 | Keep a condensed, collapsible problem statement visible in the mobile Notes tab (`solve-surface.tsx:269` currently hides it) | ~1 h | Notes are manipulation of the problem; hiding the source adds working-memory load exactly when the user is trying to offload it. |
+
+**Gated on step 3 (attempt persistence):**
+
+| # | Change | Effort | Rationale |
+| --- | --- | --- | --- |
+| 7 | See the amendment to step 4 above — do not hard-require the error kind inline | decision, folded into step 4 | Gating advance on self-diagnosis puts a compliance wall at the moment of lowest motivation, right after failure. |
+| 10 | Session recap screen at queue completion: attempted, correct, median time, this-session ribbon, one derived next action, and the batched error-kind prompt from item 7 | ~half day | Highest single-item impact in the analysis, ranked last only on effort. "Finish" is currently a bare navigation event — the most heavily weighted moment of the experience (peak-end rule) is nothing at all. Needs real attempts to summarize. |
+
+**Also noted, not itemized above (see `ENGAGEMENT_ANALYSIS.md` for detail):**
+a starter problem set so new accounts don't land on a disabled primary button
+(§1.1); spaced-repetition due dates over the existing `readyToReview` data
+(§7.1) — the one mechanic where user retention and material retention are the
+same thing; an opt-in, self-scheduled daily reminder and exam-date awareness
+(§2.1, §7.2).
 
 ---
 
