@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { SolveProblem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Input, TextArea } from "@/components/ui/field";
@@ -59,6 +59,7 @@ export function AnswerInput({
   disabled,
 }: AnswerInputProps) {
   const format = problem.answerFormat;
+  const inputId = useId();
 
   if (format.kind === "choice") {
     return (
@@ -100,13 +101,13 @@ export function AnswerInput({
     return (
       <div className="flex flex-col gap-2">
         <label
-          htmlFor="answer"
+          htmlFor={inputId}
           className="text-[13px] font-medium text-ink-2"
         >
           Your reasoning
         </label>
         <TextArea
-          id="answer"
+          id={inputId}
           rows={5}
           disabled={disabled}
           value={value}
@@ -124,12 +125,12 @@ export function AnswerInput({
 
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor="answer" className="text-[13px] font-medium text-ink-2">
+      <label htmlFor={inputId} className="text-[13px] font-medium text-ink-2">
         Your answer
       </label>
       <div className="flex items-center gap-2">
         <Input
-          id="answer"
+          id={inputId}
           mono
           autoComplete="off"
           disabled={disabled}

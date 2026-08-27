@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const AUTOSAVE_MS = 500;
@@ -24,6 +24,7 @@ export function NotesPad({
   const ref = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<number | undefined>(undefined);
   const [saved, setSaved] = useState(false);
+  const notesId = useId();
 
   useEffect(() => {
     const node = ref.current;
@@ -61,7 +62,7 @@ export function NotesPad({
     <div className={cn("flex min-h-0 flex-col gap-2", className)}>
       <div className="flex items-baseline justify-between gap-3">
         <label
-          htmlFor="solve-notes"
+          htmlFor={notesId}
           className="text-[13px] font-medium text-ink-2"
         >
           Working notes
@@ -74,7 +75,7 @@ export function NotesPad({
         </span>
       </div>
       <textarea
-        id="solve-notes"
+        id={notesId}
         ref={ref}
         onChange={handleChange}
         spellCheck={false}

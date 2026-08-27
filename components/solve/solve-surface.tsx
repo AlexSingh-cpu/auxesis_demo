@@ -15,7 +15,7 @@ import {
   type SubmissionResult,
 } from "@/app/(app)/solve/actions";
 import { MathHtml } from "@/components/problem/math-html";
-import { Button, IconButton } from "@/components/ui/button";
+import { Button, buttonStyles, IconButton } from "@/components/ui/button";
 import { Shortcut } from "@/components/ui/chip";
 import { Segmented } from "@/components/ui/segmented";
 import { DifficultyMeter } from "@/components/ui/stat";
@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { AnswerInput } from "./answer-input";
 import { Feedback } from "./feedback";
 import { NotesPad } from "./notes-pad";
-import { Timer } from "./timer";
+import { Timer, type TimerHandle } from "./timer";
 
 const SPLIT_KEY = "margin-solve-split";
 const DEFAULT_SPLIT = "58%";
@@ -87,6 +87,7 @@ export function SolveSurface({
 
   const splitRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  const timerRef = useRef<TimerHandle>(null);
 
   const submitted = result !== null;
 
@@ -133,6 +134,21 @@ export function SolveSurface({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShortcutsOpen(false);
+        return;
+      }
+
+      // Only the key that toggles the sheet still works while it is open, so
+      // a background "N" or "F" cannot fire underneath a modal dialog.
+      if (shortcutsOpen) {
+        if (event.key === "?") {
+          event.preventDefault();
+          setShortcutsOpen(false);
+        }
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       const typing =
         target?.tagName === "INPUT" || target?.tagName === "TEXTAREA";
@@ -144,11 +160,6 @@ export function SolveSurface({
         return;
       }
 
-      if (event.key === "Escape") {
-        setShortcutsOpen(false);
-        return;
-      }
-
       if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
 
       if (event.key === "Enter") {
@@ -157,7 +168,7 @@ export function SolveSurface({
         else submit();
       } else if (event.key === "?") {
         event.preventDefault();
-        setShortcutsOpen((open) => !open);
+        setShortcutsOpen(true);
       } else if (event.key.toLowerCase() === "n") {
         event.preventDefault();
         goNext();
@@ -169,7 +180,7 @@ export function SolveSurface({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [goNext, submit, submitted]);
+  }, [goNext, submit, submitted, shortcutsOpen]);
 
   function setSplit(percent: number) {
     const clamped = Math.min(70, Math.max(35, percent));
@@ -252,21 +263,35 @@ export function SolveSurface({
         </div>
       </div>
 
-      {/* Desktop: resizable two-pane. */}
-      <div
-        ref={splitRef}
-        className="hidden lg:grid lg:items-start"
-        style={{
-          gridTemplateColumns: `var(--split, ${DEFAULT_SPLIT}) 13px 1fr`,
-        }}
-      >
-        <section className="pr-2">{problemPane}</section>
+      {/* Below `lg` this is a single column, one pane visible at a time via
+          the segmented control. At `lg` and up it becomes a resizable
+          two-pane grid. Same elements throughout — only their grid-area
+          placement and visibility change, so nothing ever mounts twice. */}
+      <Segmented
+        label="Solving view"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "problem", label: "Problem" },
+          { value: "notes", label: "Notes" },
+        ]}
+        className="self-start lg:hidden"
+      />
+
+      <div ref={splitRef} className="solve-grid">
+        <section
+          style={{ gridArea: "problem" }}
+          className={cn("flex flex-col lg:pr-2", tab === "notes" ? "hidden lg:flex" : "flex")}
+        >
+          {problemPane}
+        </section>
 
         <div
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize panes"
           tabIndex={0}
+          style={{ gridArea: "resizer" }}
           onPointerDown={(event) => {
             dragging.current = true;
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -291,37 +316,27 @@ export function SolveSurface({
             setSplit(percent + (event.key === "ArrowLeft" ? -2 : 2));
             persistSplit();
           }}
-          className="group flex h-full cursor-col-resize touch-none justify-center py-1"
+          className="group hidden h-full cursor-col-resize touch-none justify-center py-1 lg:flex"
         >
           <span className="w-px bg-line transition-colors duration-150 group-hover:bg-accent" />
         </div>
 
-        <section className="flex flex-col gap-6 pl-4">
+        <section
+          style={{ gridArea: "answer" }}
+          className={cn("flex flex-col lg:pl-4", tab === "notes" ? "hidden lg:flex" : "flex")}
+        >
           {answerPane}
-          <NotesPad problemId={problem.id} />
         </section>
-      </div>
 
-      {/* Mobile: one pane at a time. */}
-      <div className="flex flex-col gap-5 lg:hidden">
-        <Segmented
-          label="Solving view"
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: "problem", label: "Problem" },
-            { value: "notes", label: "Notes" },
-          ]}
-          className="self-start"
-        />
-        {tab === "problem" ? (
-          <div className="flex flex-col gap-6">
-            {problemPane}
-            {answerPane}
-          </div>
-        ) : (
-          <NotesPad problemId={problem.id} className="min-h-[50vh]" />
-        )}
+        <section
+          style={{ gridArea: "notes" }}
+          className={cn("flex flex-col lg:pl-4", tab === "problem" ? "hidden lg:flex" : "flex")}
+        >
+          <NotesPad
+            problemId={problem.id}
+            className={tab === "notes" ? "min-h-[50vh] lg:min-h-0" : undefined}
+          />
+        </section>
       </div>
 
       {/* Action bar. Sits above the mobile tab bar, inline on desktop. */}
@@ -331,7 +346,7 @@ export function SolveSurface({
           "bg-bg/95 px-4 py-3 backdrop-blur-md md:bottom-0 md:mx-0 md:rounded-control md:border md:px-4"
         )}
       >
-        <Timer running={!submitted} />
+        <Timer ref={timerRef} running={!submitted} />
         <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={goNext}>
             Skip
@@ -376,6 +391,45 @@ function ShortcutSheet({ onClose }: { onClose: () => void }) {
     ["Esc", "Close"],
   ];
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, []);
+
+  // A minimal trap: cycle Tab between the first and last focusable elements
+  // so background content never receives focus while this is open.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Tab" || !containerRef.current) return;
+
+      const focusable = containerRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center p-4"
@@ -383,6 +437,7 @@ function ShortcutSheet({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-label="Keyboard shortcuts"
@@ -403,14 +458,14 @@ function ShortcutSheet({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </dl>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="mt-5 w-full"
+        <button
+          ref={closeButtonRef}
+          type="button"
           onClick={onClose}
+          className={buttonStyles("secondary", "sm", "mt-5 w-full")}
         >
           Close
-        </Button>
+        </button>
       </div>
     </div>
   );

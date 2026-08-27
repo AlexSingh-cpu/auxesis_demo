@@ -166,6 +166,31 @@
   background-size: 24px 24px;
 }
 
+/* Solve surface: one grid that rearranges at `lg` instead of two parallel
+   subtrees toggled by `hidden`, so the problem body, answer input, and notes
+   pad each mount exactly once regardless of viewport. */
+@layer components {
+  .solve-grid {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "problem"
+      "answer"
+      "notes";
+  }
+
+  @media (width >= 64rem) {
+    .solve-grid {
+      align-items: start;
+      grid-template-columns: var(--split, 58%) 13px 1fr;
+      grid-template-areas:
+        "problem resizer answer"
+        "problem resizer notes";
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
