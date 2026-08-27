@@ -136,7 +136,7 @@ step · reachable new-account empty states · any test runner.
 
 Ordered by dependency, not by size. Each step states why it is where it is.
 
-### 1. Repair the solve surface
+### 1. Repair the solve surface — done (`c475c28`)
 
 *Rationale: a prerequisite for everything else — step 3 cannot send elapsed time
 until the timer exposes it, and duplicate IDs make any UI test unreliable.*
