@@ -83,7 +83,8 @@ export function Feedback({
       {needsErrorKind && !selfGraded ? (
         <div className="flex flex-col gap-2.5">
           <p className="text-[13px] text-ink-2">
-            What went wrong? This is what makes your analytics diagnostic.
+            What went wrong? Knowing whether you slipped or never had the
+            method is the difference between practice and repetition.
           </p>
           <div className="flex flex-wrap gap-2">
             {ERROR_KINDS.map((entry) => (

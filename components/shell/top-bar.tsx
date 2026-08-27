@@ -22,11 +22,12 @@ export async function TopBar() {
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {streak > 0 ? (
-            <p className="hidden items-baseline gap-1.5 lg:flex">
+            <p className="flex items-baseline gap-1 lg:gap-1.5">
               <span className="font-mono tnum text-sm font-medium text-ink">
                 {streak}
               </span>
-              <span className="text-[13px] text-ink-3">
+              <span className="text-[13px] text-ink-3 lg:hidden">d</span>
+              <span className="hidden text-[13px] text-ink-3 lg:inline">
                 day{streak === 1 ? "" : "s"} running
               </span>
             </p>

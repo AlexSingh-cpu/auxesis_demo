@@ -107,8 +107,8 @@ export function UploadPanel() {
 
       <p className="shrink-0 text-[11px] leading-relaxed text-ink-3">
         {files.length > 0
-          ? "Queued locally. Classification runs once the backend is connected."
-          : "We read each problem and tag it by topic, type, and difficulty."}
+          ? "Saved on this device. We'll read and sort these once uploads are live."
+          : "We'll read each problem and tag it by topic, type, and difficulty."}
       </p>
     </div>
   );

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { FlagIcon } from "@phosphor-icons/react";
 import {
@@ -21,6 +28,26 @@ import { Timer } from "./timer";
 
 const SPLIT_KEY = "margin-solve-split";
 const DEFAULT_SPLIT = "58%";
+const SPOILER_HINT_KEY = "margin-spoiler-hint-seen";
+const SPOILER_HINT_LIMIT = 3;
+
+/** No external event fires when the count changes, so nothing needs to
+ *  subscribe: this mount's value only needs to be read once, up front. */
+function noopSubscribe() {
+  return () => {};
+}
+
+function getSpoilerHintSnapshot(): boolean {
+  try {
+    return Number(window.localStorage.getItem(SPOILER_HINT_KEY) ?? "0") < SPOILER_HINT_LIMIT;
+  } catch {
+    return true;
+  }
+}
+
+function getSpoilerHintServerSnapshot(): boolean {
+  return false;
+}
 
 interface SolveSurfaceProps {
   problem: SolveProblem;
@@ -52,6 +79,11 @@ export function SolveSurface({
   const [flagged, setFlagged] = useState(problem.status === "flagged");
   const [tab, setTab] = useState<"problem" | "notes">("problem");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const showSpoilerHint = useSyncExternalStore(
+    noopSubscribe,
+    getSpoilerHintSnapshot,
+    getSpoilerHintServerSnapshot
+  );
 
   const splitRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
@@ -81,6 +113,21 @@ export function SolveSurface({
       if (stored) node.style.setProperty("--split", stored);
     } catch {
       // Fall back to the default split.
+    }
+  }, []);
+
+  // The spoiler rule is the product's core premise and is otherwise never
+  // stated in the UI. Explain it for the first few problems, then stop. This
+  // mount's copy of showSpoilerHint already reflects the count read above;
+  // this only advances the count for the mount after this one.
+  useEffect(() => {
+    try {
+      const seen = Number(window.localStorage.getItem(SPOILER_HINT_KEY) ?? "0");
+      if (seen < SPOILER_HINT_LIMIT) {
+        window.localStorage.setItem(SPOILER_HINT_KEY, String(seen + 1));
+      }
+    } catch {
+      // Local storage unavailable; the hint simply keeps showing.
     }
   }, []);
 
@@ -146,7 +193,14 @@ export function SolveSurface({
         html={bodyHtml}
         className="text-[17px] leading-[1.7] text-ink"
       />
-      <p className="font-mono text-[13px] text-ink-3">{citation}</p>
+      <div className="flex flex-col gap-1">
+        <p className="font-mono text-[13px] text-ink-3">{citation}</p>
+        {showSpoilerHint && !submitted ? (
+          <p className="text-[12px] text-ink-3">
+            Topic and method stay hidden until you answer.
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 

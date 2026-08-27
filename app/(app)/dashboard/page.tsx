@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PracticeFilters } from "@/components/dashboard/practice-filters";
 import { ProfileSnapshot } from "@/components/dashboard/profile-snapshot";
 import { RecentSolved } from "@/components/dashboard/recent-solved";
 import { UploadPanel } from "@/components/dashboard/upload-panel";
+import { buttonStyles } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { PanelHeader, Surface } from "@/components/ui/surface";
 import { getDashboard, getQueue } from "@/lib/mock/api";
@@ -84,9 +86,34 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
             />
           </Surface>
 
+          {/* Zero-decision path: no filters to set, just the queue as it stands.
+              The filter panel below is for when you want to be specific. */}
+          <Surface className="flex shrink-0 items-center gap-4 px-4 py-3.5">
+            <div className="flex min-w-0 flex-col">
+              <p className="text-[13px] font-medium text-ink">
+                {data.queuedCount > 0
+                  ? `${data.queuedCount} problem${data.queuedCount === 1 ? "" : "s"} ready`
+                  : "Nothing queued right now"}
+              </p>
+              <p className="text-[12px] text-ink-3">
+                {data.queuedCount > 0
+                  ? "No filters needed — jump straight in."
+                  : "Add problems below, or loosen your filters."}
+              </p>
+            </div>
+            {data.queuedCount > 0 ? (
+              <Link
+                href="/solve"
+                className={`${buttonStyles("primary", "md")} ml-auto shrink-0`}
+              >
+                Start practice
+              </Link>
+            ) : null}
+          </Surface>
+
           <Surface className="flex shrink-0 flex-col">
             <PanelHeader
-              title="What do you want to solve?"
+              title="Or, choose what to work on"
               hint={`${matches.length} of ${library.length}`}
             />
             <PracticeFilters
