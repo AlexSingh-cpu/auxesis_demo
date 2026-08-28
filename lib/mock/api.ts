@@ -27,6 +27,18 @@ import { problems, profile, textbooks, topics } from "./fixtures";
 const REFERENCE_DATE = new Date("2026-08-25T04:00:00.000Z");
 const HISTORY_DAYS = 70;
 
+/** Real time elapsed since this module loaded, offset to start at
+ *  REFERENCE_DATE. A live attempt gets a timestamp on the same "today" that
+ *  every REFERENCE_DATE-anchored range/streak calculation already assumes,
+ *  while still ticking forward through a session so attempts sort correctly
+ *  against each other. Do not use this inside `buildAttempts` — the seeded
+ *  backfill must stay anchored to the fixed instant so historical charts
+ *  never drift between renders. */
+const PROCESS_START = Date.now();
+function now(): Date {
+  return new Date(REFERENCE_DATE.getTime() + (Date.now() - PROCESS_START));
+}
+
 /** Latent per-topic ability, so weak spots, the mastery grid, and the trend all
  *  tell the same story instead of contradicting each other. */
 const ABILITY: Record<string, number> = {
@@ -126,6 +138,55 @@ function buildAttempts(): Attempt[] {
 }
 
 const attempts = buildAttempts();
+let liveAttemptCounter = 0;
+
+/** Appends a real attempt to the same array every getter already reads, so
+ *  the dashboard ribbon, profile charts, and streak all move immediately —
+ *  no separate "live" store to keep in sync with the seeded one. */
+export async function recordAttempt(input: {
+  problemId: string;
+  outcome: AttemptOutcome;
+  errorKind?: ErrorKind;
+  submittedAnswer: string;
+  seconds: number;
+}): Promise<Attempt> {
+  const problem = problems.find((p) => p.id === input.problemId);
+  const attempt: Attempt = {
+    // "live" keeps this out of the seeded a_NNNN id space, so the two series
+    // can never collide.
+    id: `a_live_${(liveAttemptCounter++).toString().padStart(4, "0")}`,
+    problemId: input.problemId,
+    outcome: input.outcome,
+    errorKind: input.errorKind,
+    submittedAnswer: input.submittedAnswer,
+    seconds: input.seconds,
+    at: now().toISOString(),
+    topicId: problem?.topicId ?? "",
+    difficulty: problem?.difficulty ?? 3,
+  };
+  attempts.push(attempt);
+  return attempt;
+}
+
+/** Proofs are self-graded: the first attempt is written as `partial`, and
+ *  this overwrites it once the student judges their own work against the
+ *  reference. */
+export async function updateAttemptOutcome(
+  attemptId: string,
+  outcome: AttemptOutcome
+): Promise<Attempt | null> {
+  const attempt = attempts.find((a) => a.id === attemptId);
+  if (!attempt) return null;
+  attempt.outcome = outcome;
+  return attempt;
+}
+
+/** So a freshly recorded attempt's relative-time label ("just now") is
+ *  computed against the same clock it was stamped with, not the real wall
+ *  clock the rest of REFERENCE_DATE-anchored history ignores. */
+export async function getMockNow(): Promise<string> {
+  return now().toISOString();
+}
 
 function isScored(a: Attempt) {
   return a.outcome !== "skipped";

@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { FlagIcon } from "@phosphor-icons/react";
 import {
+  confirmGrade,
   submitAnswer,
   type SubmissionResult,
 } from "@/app/(app)/solve/actions";
@@ -93,8 +94,9 @@ export function SolveSurface({
 
   const submit = useCallback(() => {
     if (submitted || pending || answer.trim() === "") return;
+    const seconds = timerRef.current?.getSeconds() ?? 0;
     startTransition(async () => {
-      const submission = await submitAnswer(problem.id, answer);
+      const submission = await submitAnswer(problem.id, answer, seconds);
       setResult(submission);
       setOutcome(submission.outcome);
       setSelfGraded(submission.selfGraded);
@@ -236,6 +238,10 @@ export function SolveSurface({
           onSelfGrade={(next) => {
             setOutcome(next);
             setSelfGraded(false);
+            // result is non-null here — Feedback only renders once it is.
+            startTransition(async () => {
+              await confirmGrade(result.attemptId, next);
+            });
           }}
         />
       ) : null}

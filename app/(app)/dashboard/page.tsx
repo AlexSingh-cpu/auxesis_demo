@@ -7,7 +7,7 @@ import { UploadPanel } from "@/components/dashboard/upload-panel";
 import { buttonStyles } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { PanelHeader, Surface } from "@/components/ui/surface";
-import { getDashboard, getQueue } from "@/lib/mock/api";
+import { getDashboard, getMockNow, getQueue } from "@/lib/mock/api";
 import { textbooks, topics } from "@/lib/mock/fixtures";
 import {
   FILTERABLE_STATUSES,
@@ -26,10 +26,11 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const params = await props.searchParams;
   const spec = parseQueueSpec(params);
 
-  const [data, matches, library] = await Promise.all([
+  const [data, matches, library, mockNow] = await Promise.all([
     getDashboard(),
     getQueue(spec),
     getQueue({}),
+    getMockNow(),
   ]);
 
   /** Facet counts ignore the group being counted, so a chip shows what you
@@ -64,7 +65,9 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
             <RecentSolved
               attempts={data.recentAttempts}
               solved={data.recentSolved}
-              now={new Date().toISOString()}
+              // The real Date() would put a freshly recorded attempt "2 days
+              // ago" — attempts are stamped against the same mock clock.
+              now={mockNow}
             />
           ) : (
             <div className="p-5">
