@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { ArrowRightIcon, UploadSimpleIcon } from "@phosphor-icons/react/ssr";
 import { Button, IconButton } from "@/components/ui/button";
 import { Shortcut, Tag } from "@/components/ui/chip";
@@ -76,6 +77,10 @@ function Swatch({ name, className }: { name: string; className: string }) {
 }
 
 export default function ScratchPage() {
+  // A dev-only reference for the design tokens and primitives — never
+  // something an end user should be able to reach.
+  if (process.env.NODE_ENV === "production") notFound();
+
   return (
     <div className="min-h-[100dvh] bg-bg">
       <header className="sticky top-0 z-10 border-b border-line bg-bg/85 backdrop-blur-md">
