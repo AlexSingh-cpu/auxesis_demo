@@ -154,7 +154,7 @@ until the timer exposes it, and duplicate IDs make any UI test unreliable.*
   inside it, restore focus to the trigger on close, and suppress `N` / `F` while
   it is open.
 
-### 2. Add Vitest and cover the pure logic
+### 2. Add Vitest and cover the pure logic — done (`4ceab3c`)
 
 *Rationale: a cheap safety net installed before step 3 touches the data layer.
 The spoiler rule is the product's core promise and has no guard at all today.*
