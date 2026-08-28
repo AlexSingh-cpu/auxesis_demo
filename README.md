@@ -13,7 +13,7 @@ Margin is a three-page app. There is no fourth page hiding the analytics, and th
 
 Dark by default. Light if you choose it. The graph-paper motif shows up on empty states and the dropzone, never on a scrolling list.
 
-**Successor agents:** read [Development status](#development-status-read-this-before-changing-anything) before writing code. The UI is far ahead of the data layer. The next job is persisting attempts, not another page.
+**Successor agents:** read [Development status](#development-status-read-this-before-changing-anything) before writing code. The screens, grading, and data layer are all live — submitting an answer really is recorded, flags and error kinds persist, `Problem.status` is derived from real attempts. What's missing is a database (everything lives in server memory), auth (one hardcoded user), and the upload → classification pipeline (`/upload` is still an honest stub). See [`OVERVIEW.md`](./OVERVIEW.md) for the full capability breakdown and [`PLAN.md`](./PLAN.md) for what's next and why, in order — this file doesn't duplicate either.
 
 ---
 
@@ -28,7 +28,7 @@ On a large laptop this is meant to fit without scrolling.
 | **Left** | Last 40 attempts as a tick ribbon (oldest → newest), then the last eight as a list: outcome, citation, time. |
 | **Right** | A strip of lifetime stats (solved, percent correct, streak), the filter panel, then a dropzone for adding problems. |
 
-The filters *are* the queue. Textbook and topic are dropdowns. Difficulty, type, and status are chips. Each chip shows how many problems you would get by adding it, given the other filters already on. Zero matches disables **Start practice** rather than letting you walk into an empty session.
+A **Start practice** bar sits above the filters and needs no configuration — it shows how many problems are queued and goes straight into `/solve`. The filters below it are for when you want to be specific, not the default path: textbook and topic are dropdowns, difficulty/type/status are chips, and each chip shows how many problems you would get by adding it, given the other filters already on. Zero matches disables the filtered **Start practice** rather than letting you walk into an empty session.
 
 The spec lives in the query string, so it survives the hop into Solve and comes back with you when the session ends:
 
@@ -55,13 +55,15 @@ While a problem is open you see:
 
 Desktop is two panes with a draggable divider (arrow keys work; the position is remembered). Phone is Problem / Notes tabs and a sticky action bar.
 
-**After you submit**, feedback is inline. Outcome, the typeset answer, and then — only then — the classification: chapter title, subtopic, tags. On a miss you mark what went wrong: concept, arithmetic, setup, or incomplete. Proofs are self-graded against the reference.
+**After you submit**, feedback is inline. Outcome, the typeset answer, and then — only then — the classification: chapter title, subtopic, tags. On a miss you mark what went wrong: concept, arithmetic, setup, or incomplete, and it's saved to that attempt as soon as you pick it. Proofs are self-graded against the reference — tapping "I got this" or "I missed it" overwrites the recorded attempt, not just the screen.
+
+Flagging a problem and skipping it both persist: a flag survives navigation and keeps the problem in your queue; a skip is recorded as a `skipped` attempt in the background so it doesn't sit invisibly outside your history, without waiting on that write to advance you.
 
 | Key | Action |
 | --- | --- |
 | `Enter` | Submit, then advance |
 | `⌘/Ctrl + Enter` | Submit from the notes pad |
-| `N` | Next problem |
+| `N` | Next problem (skips and records it, if not yet submitted) |
 | `F` | Flag |
 | `?` | Shortcut sheet |
 | `Esc` | Close it |
@@ -128,168 +130,30 @@ Theme is stored under `margin-theme` and applied before first paint so the page 
 
 ## Development status (read this before changing anything)
 
-This is a **frontend prototype on seeded mock data**. The screens, design system, grading, and URL-driven queue are built. There is **no database, no auth, and no persistence of attempts**. Submitting an answer grades it for that page load only; it does not update the dashboard ribbon, the profile charts, problem `status`, or the mock store.
+The screens, design system, grading, URL-driven queue, and data layer are all **live** — this is not a static mockup. Submitting an answer really is graded, recorded as an `Attempt`, and reflected on the dashboard and profile without a reload. Flags and error-kind tags persist. `Problem.status` (`mastered` / `missed` / `flagged` / `unattempted`) is derived from real attempt history, not read off a static fixture. Full breakdown, function-by-function: **[`OVERVIEW.md`](./OVERVIEW.md)**.
 
-**Stack (locked):** Next.js **16.3.2** App Router, React **19.2.8**, Tailwind **v4.3**, TypeScript. APIs differ from older Next.js. Before writing routes or server actions, read `node_modules/next/dist/docs/` (see `AGENTS.md`). Do not assume Pages Router, `next/head`, or Tailwind v3 `@tailwind` directives.
+What's still missing, in the order it's sequenced: the upload → classification pipeline (`/upload` is a working stub — the dashboard's dropzone collects files but nothing is parsed yet), then auth (one hardcoded user) and a real database (everything above lives in one JS array in server memory — a process restart erases every live attempt back to the seeded baseline). Full plan, with rationale for the ordering and a "done when" check per step: **[`PLAN.md`](./PLAN.md)**. Don't maintain a second copy of that list here — update `PLAN.md` and let this file stay a pointer.
 
-**Mock clock:** attempt history is generated against `REFERENCE_DATE = 2026-08-25T04:00:00.000Z` in `lib/mock/api.ts` (mulberry32 seed `20260825`). Do not use `Date.now()` for those derived stats or the streak will drift.
+**Stack (locked):** Next.js **16.3.2** App Router, React **19.2.8**, Tailwind **v4.3**, TypeScript, Vitest. APIs differ from older Next.js. Before writing routes or server actions, read `node_modules/next/dist/docs/` (see `AGENTS.md`). Do not assume Pages Router, `next/head`, or Tailwind v3 `@tailwind` directives.
 
----
-
-### Done — do not rebuild
-
-| Area | What exists | Where |
-| --- | --- | --- |
-| Design tokens, dark-first theme, graph-paper, fonts | CSS variables, `dark`/`light` on `<html>`, no-flash script | `app/globals.css`, `app/layout.tsx`, `lib/theme.ts` |
-| UI primitives | Button, Field, Chip, Surface, Stat, Skeleton, EmptyState, Segmented, Avatar, ThemeToggle | `components/ui/` |
-| App shell | Top bar (segmented nav + named profile chip), mobile tab bar, page chrome | `components/shell/`, `app/(app)/layout.tsx` |
-| Three-page IA | Dashboard launcher, Solve, Profile. **No `/queue` route** (deleted on purpose). | `app/(app)/dashboard`, `solve`, `profile` |
-| Domain types | Problem, Attempt, QueueSpec, analytics shapes, `SolveProblem` redaction | `lib/types.ts` |
-| Mock library | 16 handcrafted problems, 3 textbooks, 10 topics, 1 user, ~70 days of attempts | `lib/mock/fixtures.ts`, `lib/mock/api.ts` |
-| Queue / filters | URL spec `book`, `topic`, `d`, `kind`, `status`; faceted chip counts; default status = not mastered | `lib/queue.ts`, `components/dashboard/practice-filters.tsx` |
-| Session continuity | `/solve` redirects to first match; next/finish keep the query string; finish → `/dashboard?…` | `app/(app)/solve/page.tsx`, `solve/[problemId]/page.tsx` |
-| KaTeX | Server `renderMathHtml` / `renderTex`; client preview lazy-loads KaTeX | `lib/math.ts`, `components/problem/math-html.tsx`, `answer-input.tsx` |
-| Spoiler withholding | Client gets `toSolveProblem` (allowlist). Answer, tags, subtopic, source heading stay server-side until submit. Tab title is the citation. | `lib/problem.ts`, `app/(app)/solve/actions.ts` |
-| Grading | Choice / numeric / expression / free-response / skip | `lib/grade.ts` via server action `submitAnswer` |
-| Solve surface | Split panes, notes, timer, flag UI, shortcuts, inline feedback + error-kind chips | `components/solve/` |
-| Dashboard layout | Recent ribbon + list (left); profile snapshot, compact filters, upload dropzone (right) | `app/(app)/dashboard/page.tsx` |
-| Profile analytics | Range `?range=7d\|30d\|all`; trend, mastery grid, error breakdown, time histogram, weak spots, review list, sessions, textbooks | `app/(app)/profile/page.tsx`, `components/profile/` |
-| 404 | Custom `app/not-found.tsx` | |
-| Dashboard loading/error | Skeleton + error boundary | `dashboard/loading.tsx`, `dashboard/error.tsx` |
-| Solve problem loading | Skeleton matching two-pane layout | `solve/[problemId]/loading.tsx` |
+**Mock clock:** attempt history is generated against `REFERENCE_DATE = 2026-08-25T04:00:00.000Z` in `lib/mock/api.ts` (mulberry32 seed `20260825`). Live attempts are stamped by a `now()` helper — real elapsed time since the module loaded, offset to start at `REFERENCE_DATE` — not `Date.now()` directly; the streak and range calculations are anchored to `REFERENCE_DATE` as "today" and a live attempt on the real wall clock would silently fall outside that window. Holds correctly for any single session; a multi-day dev-server uptime is the one case that needs real revisiting (noted in `PLAN.md`).
 
 **Product decisions already made (do not silently reverse):**
 
 - Analytics live on **Profile**, not Dashboard. Dashboard is a launcher.
 - Filters live on **Dashboard**. Do not recreate `/queue`.
 - Dark is the default theme. Tokens: `--ink` / `--surface` / `--accent` / `--ember` / `--flag`. Shape lock: 12 / 8 / 4 / pill-chips-only.
-- `toSolveProblem` **lists allowed fields**. Adding a secret to `Problem` must not automatically ship it to the client.
-- Empty status filter means `PRACTICE_STATUSES` (unattempted, missed, flagged, in-progress), not “match nothing.”
+- `toSolveProblem` **lists allowed fields**. Adding a secret to `Problem` must not automatically ship it to the client — `lib/problem.test.ts` asserts the exact allowed key set, so a forgotten field fails a test instead of leaking silently.
+- Empty status filter means `PRACTICE_STATUSES` (unattempted, missed, flagged, in-progress), not "match nothing."
 - Facet counts ignore the group being counted.
 - Lifetime stats on the dashboard vs 30-day stats on the profile are **supposed** to disagree.
-
----
-
-### Partial — UI exists, data does not stick
-
-| Feature | Current behaviour | Gap |
-| --- | --- | --- |
-| `submitAnswer` | Grades and returns HTML + tags | Does **not** append an `Attempt`, change `Problem.status`, or revalidate dashboard/profile |
-| Flag (`F` / icon) | React state on `SolveSurface`, seeded from `problem.status` | Lost on navigation; never written to the mock API |
-| Error-kind chips | Client state after a miss | Never sent to the server; profile “Where it goes wrong” is 100% generated history |
-| Notes pad | `localStorage` key `margin-notes-${problemId}` | Not associated with a user or attempt |
-| Pane split | `localStorage` key `margin-solve-split` | Fine as-is |
-| Theme | `localStorage` key `margin-theme` | Fine as-is; no Settings page |
-| Upload dropzone | Drag/pick `image/*` + PDF; lists filenames in component state | Files are not uploaded, stored, OCR’d, or classified. Copy says so. |
-| `/upload` | Stub empty state | Dead route; real UI is the dashboard panel |
-| `/scratch` | Design-token gallery | Dev leftover; not in the primary nav |
-| Problem `status` on fixtures | Static (`unattempted` / `missed` / `flagged` / `mastered`) | Not derived from attempts; queue and “mastered” counts will disagree with a live session until persistence exists |
-| Loading/error | Only dashboard has `error.tsx`; profile and `/solve` landing have no `loading.tsx` | Add when those pages get slower data |
-
----
-
-### Still to add
-
-Build these against the types and screens that already exist. Do not add a fourth primary page, do not resurrect `/queue`, and do not move analytics off Profile.
-
-#### 1. Live attempts (do this first)
-
-The product currently *displays* history it never *records*. `submitAnswer` in `app/(app)/solve/actions.ts` returns a grade and stops. The in-memory `attempts` array in `lib/mock/api.ts` is filled once at module load by `buildAttempts()` and then treated as read-only.
-
-What to add:
-
-- Accept `seconds` and optional `errorKind` from the client (the timer and the error chips already live on `SolveSurface`; they are just not sent).
-- After grading, append an `Attempt` (`lib/types.ts`: id, problemId, outcome, errorKind?, submittedAnswer, seconds, at, topicId, difficulty).
-- Keep that list in a mutable store the existing getters already read (`getDashboard`, `getAnalytics`, `getStreak`, `sessionSummaries`). A module-level array is enough until a database lands.
-- Revalidate or `router.refresh()` so the dashboard ribbon, “recently solved,” lifetime stats, and profile charts move without a full reload.
-- For proofs: the first response is `partial` + `selfGraded`. A second call (or a small `confirmGrade` action) must overwrite that attempt when the student taps “I got this” / “I missed it.” Right now those buttons only change React state.
-- Use a real timestamp for *new* rows. Keep `REFERENCE_DATE` only for the seeded backfill so historical charts stay stable.
-
-Done when: submit a wrong numeric answer, reload `/dashboard`, and see a new ember tick and a new row; open Profile and see attempted +1.
-
-#### 2. Problem status that follows attempts
-
-Fixture `status` is static. The queue still offers a problem you just mastered, and the snapshot’s “3 mastered” never increments.
-
-Derive status from attempts (suggestion, not implemented):
-
-| Condition | Status |
-| --- | --- |
-| Flagged by the student | `flagged` (keep even after a later correct) |
-| Latest scored attempt correct, and not flagged | `mastered` |
-| Latest scored attempt incorrect / partial | `missed` |
-| Opened or notes saved, never submitted | `in-progress` (optional) |
-| No attempts | `unattempted` |
-
-`getQueue` already filters on `status`. Once this is live, default practice (`PRACTICE_STATUSES`) will naturally skip mastered items.
-
-#### 3. Flags and error kinds on the server
-
-- Flag: today `setFlagged` is local. Add `flagProblem(id, flagged)` (or persist on submit) so a flagged problem stays flagged in the queue and on the next visit.
-- Error kind: require it before leaving a miss (the UI already asks). Store it on the `Attempt`. Profile “Where it goes wrong” should mix seeded history with live marks, not ignore the live ones.
-
-#### 4. Upload that creates problems
-
-Dashboard `UploadPanel` is a filename list in `useState`. Need:
-
-- Store the file (local disk or object storage).
-- Parse a photo/PDF of a chapter into candidate problems (OCR / vision / whatever the backend will be).
-- A **review step** before they enter the library: body (LaTeX), source (book, chapter, number), proposed topic / kind / difficulty / tags / answer. The student must be able to edit a bad classification. This is the real `/upload` page — replace the stub rather than inventing a fourth nav item.
-- Insert `Problem` rows into the same store `getQueue` reads. New problems should appear in filters immediately.
-- Keep the spoiler rule: classification is ours; do not put tags in any pre-submit client payload.
-
-Until this exists, the dropzone copy must keep saying files are queued locally only.
-
-#### 5. Auth and a real user
-
-One hardcoded `UserProfile`. Need sign-up / sign-in, a real `userId` on attempts and textbooks, and isolation so two people do not share Priya’s ribbon. Onboarding can be thin: name, course, first textbook. Do not add a marketing site; `/` should keep redirecting to `/dashboard` once logged in (or to a login screen).
-
-Swap `lib/mock/api.ts` for implementations with the **same async signatures** (`getDashboard`, `getQueue`, `getProblem`, `getAnalytics`, `getProfileData`, `getStreak`) so pages do not get rewritten.
-
-#### 6. Database
-
-No ORM, no migrations, no `.env` connection. When you add one, persist: users, textbooks, problems, attempts, flags, notes (today notes are `localStorage` only). Seed or import the 16 fixtures so the UI has something to show in development.
-
-#### 7. Worked solutions
-
-`Problem.workedSolution` is on the type and almost unused. After submit, optionally reveal a step-by-step writeup under the answer — still server-rendered, still withheld until commit. Do not show it on the dashboard or in problem lists.
-
-#### 8. Tests
-
-There is no test runner script beyond `lint`. Add tests before the grader or queue parser get cleverer:
-
-- `gradeAnswer`: `2/15` ≡ `0.1333`, `+ C` optional, choice ids, numeric tolerance, empty → skipped, free-response → self-graded.
-- `parseQueueSpec` / `queueQuery`: comma-separated multi values, invalid `d` dropped, empty status → `PRACTICE_STATUSES`.
-- `toSolveProblem`: returned object has no `answer`, `tags`, `subtopic`, or `source`.
-
-#### 9. Settings (small)
-
-Theme toggle is enough for colour. Still missing, if wanted later: default filter preset, “end session after N problems,” account/course edit, delete-my-data. Do **not** add a “show tags while solving” setting that undoes the spoiler rule.
-
-#### 10. Housekeeping (do not treat as features)
-
-- Redirect `/upload` → `/dashboard` or replace it with the review step in (4).
-- Delete `/scratch` once nobody is checking tokens there.
-- `error.tsx` / `loading.tsx` on profile and `/solve` when those pages hit a real network.
-- Empty dashboard/profile for a brand-new account (all current empty states exist but are never shown, because the mock history is always full).
-
-#### 11. Out of scope unless asked
-
-A public marketing landing page, social/sharing, spaced-repetition algorithms beyond “missed more than once,” live multiplayer, a native app, and a second navigation model. The three pages are the product.
-
----
-
-### What to do next (recommended order)
-
-1. Record attempts (section 1) — this unblocks everything that looks “dead” after you solve.
-2. Derive problem status (2) and persist flags / error kinds (3).
-3. Tests for grader + queue (8).
-4. Real upload + classification review (4); retire the `/upload` stub.
-5. Auth + database (5–6), keeping the mock API’s function shapes.
-6. Worked solutions (7) and empty-account states (10).
-7. Remove `/scratch`.
+- `Problem.status` is never read from the static fixture — always through `derivedStatus()` in `lib/mock/api.ts`. A new read site must go through `getProblem`/`getQueue`, not the raw fixture array.
+- The error-kind chip stays optional and inline; do not gate advancing on classifying a miss (see `ENGAGEMENT_ANALYSIS.md` §5.3 for why).
+- `/upload` gets the real review UI when it's built — do not invent a fourth nav item; the dashboard dropzone is the entry point.
 
 When adding fields to `Problem`, update `toSolveProblem` / `SolveProblem` deliberately. Prefer withholding.
+
+Out of scope unless asked: a public marketing landing page, social/sharing, spaced-repetition beyond "missed more than once," live multiplayer, a native app, a second navigation model.
 
 ---
 
@@ -312,6 +176,7 @@ Problems `p_0431` … `p_0470` (16 ids in `lib/mock/fixtures.ts`).
 | `margin-theme` | `"dark"` \| `"light"` |
 | `margin-notes-<problemId>` | Scratch pad |
 | `margin-solve-split` | Desktop divider, e.g. `58%` |
+| `margin-spoiler-hint-seen` | Count of problems where the "topic and method stay hidden" hint has shown; stops after a few |
 
 ---
 
@@ -330,20 +195,23 @@ Open [http://localhost:3000](http://localhost:3000). You land on the dashboard.
 | `npm run build` | Production build |
 | `npm start` | Serve that build |
 | `npm run lint` | ESLint |
+| `npm test` | Vitest — logic only, no browser (`lib/**/*.test.ts`) |
 
 ---
 
 ## Stack
 
-Next.js 16 (App Router), React 19, Tailwind v4, KaTeX, Motion, Phosphor icons. TypeScript throughout. The mock API in `lib/mock/` is shaped like the real one will be — async functions returning the same types — so the screens do not have to be rewritten when a database arrives.
+Next.js 16 (App Router), React 19, Tailwind v4, KaTeX, Motion, Phosphor icons, Vitest. TypeScript throughout. The mock API in `lib/mock/` is shaped like the real one will be — async functions returning the same types — so the screens do not have to be rewritten when a database arrives.
 
 ```
-app/(app)/          dashboard · solve · profile
-components/         ui primitives, then dashboard / solve / profile / shell
-lib/mock/           fixtures + seeded history
-lib/grade.ts        marking
-lib/math.ts         server-side KaTeX
-lib/queue.ts        URL spec for a session
+app/(app)/                    dashboard · solve · profile
+app/(app)/solve/actions.ts    the only mutation entry point ("use server")
+components/                   ui primitives, then dashboard / solve / profile / shell
+lib/mock/                     fixtures + the in-memory attempt/flag store + query layer
+lib/grade.ts                  marking
+lib/math.ts                   server-side KaTeX
+lib/queue.ts                  URL spec for a session
+lib/*.test.ts                 vitest — grader, queue parsing, spoiler redaction, the store itself
 ```
 
 ---
