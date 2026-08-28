@@ -205,7 +205,7 @@ Verified via `lib/mock/api.test.ts` against the real store (not mocked) —
 browser-level click-through wasn't possible in this environment (no browser
 automation tool available), so that remains a manual check before shipping.
 
-### 4. Persist flags, error kinds, and skips
+### 4. Persist flags, error kinds, and skips — done (`679c5c4`)
 
 *Rationale: completes the diagnostic loop the entire Profile page is built to
 display. Without it, "Where it goes wrong" ignores everything you actually mark.*
@@ -214,16 +214,25 @@ display. Without it, "Where it goes wrong" ignores everything you actually mark.
   in the queue.
 - **Amended by `ENGAGEMENT_ANALYSIS.md` §5.3 — do not hard-require the error
   kind inline.** The original plan was to gate advance on classifying a miss.
-  Instead: keep it one-tap and optional inline, let `Enter` advance without it,
-  and batch anything unclassified into the session recap (engagement item #10
-  below) where the user is reflective rather than mid-recovery from a miss.
-  Same data, no flow cost.
+  Kept it one-tap and optional inline, `Enter` still advances without it. Did
+  **not** wait for the session recap to exist before persisting it, though:
+  `setAttemptErrorKind` writes it to the attempt as soon as the chip is
+  picked, since the recap (engagement item #10) isn't built yet and gating a
+  real diagnostic feature on unbuilt future work wasn't worth it. Same
+  outcome either way — the data lands on the attempt — just immediately
+  instead of batched.
 - Route Skip through `submitAnswer` with an empty answer so it records a
-  `skipped` attempt.
+  `skipped` attempt. Fire-and-forget, not awaited — skip must feel instant
+  and must not reveal the answer. The `N` shortcut goes through the same
+  path now; it was already an alias for the Skip button under a different
+  trigger.
 - Derive `Problem.status` from attempts (flagged wins; else latest scored
   attempt correct → mastered, incorrect/partial → missed; no attempts →
   unattempted). This is what stops the queue re-offering a problem you just
-  mastered.
+  mastered. Applied where `Problem` objects leave `lib/mock/api.ts`
+  (`getProblem`, `getQueue`) and where `getDashboard` counts by status, so
+  every consumer (`toSolveProblem`, `toQueuedProblem`, dashboard facet
+  counts) picks it up with no changes of its own.
 
 ### 5. Fill in missing states and routes
 
@@ -301,8 +310,8 @@ badges, leaderboards, streak-shaming) were explicitly considered and rejected.
 
 | # | Change | Effort | Rationale |
 | --- | --- | --- | --- |
-| 7 | See the amendment to step 4 above — do not hard-require the error kind inline | decision, folded into step 4 | Gating advance on self-diagnosis puts a compliance wall at the moment of lowest motivation, right after failure. |
-| 10 | Session recap screen at queue completion: attempted, correct, median time, this-session ribbon, one derived next action, and the batched error-kind prompt from item 7 | ~half day | Highest single-item impact in the analysis, ranked last only on effort. "Finish" is currently a bare navigation event — the most heavily weighted moment of the experience (peak-end rule) is nothing at all. Needs real attempts to summarize. |
+| 7 | See the amendment to step 4 above — do not hard-require the error kind inline | done, in `679c5c4` | Gating advance on self-diagnosis puts a compliance wall at the moment of lowest motivation, right after failure. Landed as immediate persistence on pick rather than batching, since the recap doesn't exist yet — same outcome, no wait on unbuilt work. |
+| 10 | Session recap screen at queue completion: attempted, correct, median time, this-session ribbon, one derived next action, and a prompt for any miss still missing an error kind (some will, since the chip stays optional) | ~half day | Highest single-item impact in the analysis, ranked last only on effort. "Finish" is currently a bare navigation event — the most heavily weighted moment of the experience (peak-end rule) is nothing at all. Needs real attempts to summarize. |
 
 **Also noted, not itemized above (see `ENGAGEMENT_ANALYSIS.md` for detail):**
 a starter problem set so new accounts don't land on a disabled primary button
