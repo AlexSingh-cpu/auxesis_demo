@@ -234,13 +234,20 @@ display. Without it, "Where it goes wrong" ignores everything you actually mark.
   every consumer (`toSolveProblem`, `toQueuedProblem`, dashboard facet
   counts) picks it up with no changes of its own.
 
-### 5. Fill in missing states and routes
+### 5. Fill in missing states and routes — done (`b71f1d3`)
 
 *Rationale: small, independent, and removes the last obviously-unfinished edges.*
 
 - `loading.tsx` and `error.tsx` for Profile; `loading.tsx` for `/solve`.
-- A root `error.tsx` so an unhandled error is not a blank page.
-- Delete `/scratch`, or move it behind a dev-only guard.
+- A root `error.tsx` so an unhandled error is not a blank page. Catches
+  everything under `(app)/` without its own nested boundary; does not catch
+  errors in the root layout itself (`global-error.tsx` territory, not
+  warranted here).
+- Chose the guard over deletion for `/scratch` — `notFound()` when
+  `NODE_ENV === "production"`. It is a genuinely useful 420-line design-token
+  reference, not dead weight; the goal was keeping it out of production, not
+  losing it. Verified with a real `next build` + `next start`, not just by
+  inspection: `/scratch` 404s in production, still serves in dev.
 
 ### 6. Build the upload review step
 
