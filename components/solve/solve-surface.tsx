@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { FlagIcon } from "@phosphor-icons/react";
 import {
   confirmGrade,
+  setAttemptErrorKind,
+  setFlag,
   submitAnswer,
   type SubmissionResult,
 } from "@/app/(app)/solve/actions";
@@ -107,6 +109,29 @@ export function SolveSurface({
     router.push(nextHref);
   }, [nextHref, router]);
 
+  // Skipping abandons the problem without submitting, so it must not reveal
+  // the answer the way a real submission does — record it in the background
+  // and navigate immediately, rather than waiting on the round trip. Once
+  // already submitted this is just an alias for "next"; the real attempt was
+  // recorded by submit().
+  const skip = useCallback(() => {
+    if (submitted) {
+      goNext();
+      return;
+    }
+    const seconds = timerRef.current?.getSeconds() ?? 0;
+    void submitAnswer(problem.id, "", seconds);
+    goNext();
+  }, [goNext, problem.id, submitted]);
+
+  const toggleFlag = useCallback(() => {
+    const next = !flagged;
+    setFlagged(next);
+    startTransition(() => {
+      void setFlag(problem.id, next);
+    });
+  }, [flagged, problem.id]);
+
   // Restore the divider position without a render pass.
   useEffect(() => {
     const node = splitRef.current;
@@ -173,16 +198,16 @@ export function SolveSurface({
         setShortcutsOpen(true);
       } else if (event.key.toLowerCase() === "n") {
         event.preventDefault();
-        goNext();
+        skip();
       } else if (event.key.toLowerCase() === "f") {
         event.preventDefault();
-        setFlagged((value) => !value);
+        toggleFlag();
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [goNext, submit, submitted, shortcutsOpen]);
+  }, [goNext, skip, submit, submitted, shortcutsOpen, toggleFlag]);
 
   function setSplit(percent: number) {
     const clamped = Math.min(70, Math.max(35, percent));
@@ -234,7 +259,13 @@ export function SolveSurface({
           outcome={outcome}
           selfGraded={selfGraded}
           errorKind={errorKind}
-          onErrorKind={setErrorKind}
+          onErrorKind={(kind) => {
+            setErrorKind(kind);
+            // result is non-null here — Feedback only renders once it is.
+            startTransition(async () => {
+              await setAttemptErrorKind(result.attemptId, kind);
+            });
+          }}
           onSelfGrade={(next) => {
             setOutcome(next);
             setSelfGraded(false);
@@ -261,7 +292,7 @@ export function SolveSurface({
         <div className="ml-auto flex items-center gap-1">
           <IconButton
             label={flagged ? "Remove flag" : "Flag this problem"}
-            onClick={() => setFlagged((value) => !value)}
+            onClick={toggleFlag}
             className={flagged ? "text-flag" : undefined}
           >
             <FlagIcon size={18} weight={flagged ? "fill" : "regular"} />
@@ -354,7 +385,7 @@ export function SolveSurface({
       >
         <Timer ref={timerRef} running={!submitted} />
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={goNext}>
+          <Button variant="ghost" size="sm" onClick={skip}>
             Skip
           </Button>
           {submitted ? (

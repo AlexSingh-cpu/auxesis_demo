@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
+  flagProblem,
   getDashboard,
   getMockNow,
+  getProblem,
   getProfileData,
+  getQueue,
   recordAttempt,
+  updateAttemptErrorKind,
   updateAttemptOutcome,
 } from "@/lib/mock/api";
 import { problems } from "@/lib/mock/fixtures";
+
+/** Distinct ids per test group, so recording an attempt or a flag for one
+ *  test can never change what an unrelated test observes — this file's
+ *  tests all share the same in-memory store and run in source order. */
+const FLAG_TEST_ID = "p_0447";
+const MASTERED_TEST_ID = "p_0455";
+const MISSED_TEST_ID = "p_0392";
+const ERROR_KIND_TEST_ID = "p_0388";
 
 /** Exercises the actual mutable store step 3 introduced — the part with real
  *  logic (mock clock, in-place mutation). The Server Action plumbing around
@@ -96,5 +108,102 @@ describe("updateAttemptOutcome", () => {
   it("returns null for an unknown attempt id rather than throwing", async () => {
     const result = await updateAttemptOutcome("a_does_not_exist", "correct");
     expect(result).toBeNull();
+  });
+});
+
+describe("derived Problem.status", () => {
+  it("flags a problem regardless of its fixture default, and getQueue's status filter sees it too", async () => {
+    await flagProblem(FLAG_TEST_ID, true);
+
+    const problem = await getProblem(FLAG_TEST_ID);
+    expect(problem?.status).toBe("flagged");
+
+    const flaggedQueue = await getQueue({ statuses: ["flagged"] });
+    expect(flaggedQueue.some((p) => p.id === FLAG_TEST_ID)).toBe(true);
+  });
+
+  it("un-flagging reverts to whatever the attempt history derives, not a fixed default", async () => {
+    // The 70-day seeded backfill assigns attempts to every fixture problem,
+    // so the true baseline is whatever that history derives — not
+    // necessarily "unattempted". Clear any flag left by an earlier test
+    // first, so the baseline reflects the attempt history alone.
+    await flagProblem(FLAG_TEST_ID, false);
+    const baseline = await getProblem(FLAG_TEST_ID);
+
+    await flagProblem(FLAG_TEST_ID, true);
+    expect((await getProblem(FLAG_TEST_ID))?.status).toBe("flagged");
+
+    await flagProblem(FLAG_TEST_ID, false);
+    const after = await getProblem(FLAG_TEST_ID);
+    expect(after?.status).toBe(baseline?.status);
+  });
+
+  it("derives mastered from the latest scored attempt being correct", async () => {
+    await recordAttempt({
+      problemId: MASTERED_TEST_ID,
+      outcome: "incorrect",
+      submittedAnswer: "wrong first try",
+      seconds: 30,
+    });
+    await recordAttempt({
+      problemId: MASTERED_TEST_ID,
+      outcome: "correct",
+      submittedAnswer: "right on retry",
+      seconds: 20,
+    });
+
+    const problem = await getProblem(MASTERED_TEST_ID);
+    expect(problem?.status).toBe("mastered");
+  });
+
+  it("derives missed from the latest scored attempt being incorrect, ignoring a trailing skip", async () => {
+    await recordAttempt({
+      problemId: MISSED_TEST_ID,
+      outcome: "incorrect",
+      submittedAnswer: "wrong",
+      seconds: 30,
+    });
+    await recordAttempt({
+      problemId: MISSED_TEST_ID,
+      outcome: "skipped",
+      submittedAnswer: "",
+      seconds: 0,
+    });
+
+    // A skip is not a verdict on the problem, so the incorrect attempt
+    // before it still decides the status.
+    const problem = await getProblem(MISSED_TEST_ID);
+    expect(problem?.status).toBe("missed");
+  });
+
+  it("a flag still wins over a mastering attempt", async () => {
+    await recordAttempt({
+      problemId: FLAG_TEST_ID,
+      outcome: "correct",
+      submittedAnswer: "right",
+      seconds: 15,
+    });
+    await flagProblem(FLAG_TEST_ID, true);
+
+    const problem = await getProblem(FLAG_TEST_ID);
+    expect(problem?.status).toBe("flagged");
+  });
+});
+
+describe("updateAttemptErrorKind", () => {
+  it("attaches an error kind to the right attempt after the fact", async () => {
+    const attempt = await recordAttempt({
+      problemId: ERROR_KIND_TEST_ID,
+      outcome: "incorrect",
+      submittedAnswer: "wrong",
+      seconds: 60,
+    });
+    expect(attempt.errorKind).toBeUndefined();
+
+    await updateAttemptErrorKind(attempt.id, "arithmetic");
+
+    const after = await getDashboard();
+    const recorded = after.recentAttempts.find((a) => a.id === attempt.id);
+    expect(recorded?.errorKind).toBe("arithmetic");
   });
 });

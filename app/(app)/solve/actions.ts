@@ -3,8 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { gradeAnswer } from "@/lib/grade";
 import { renderMathHtml, renderTex } from "@/lib/math";
-import { getProblem, recordAttempt, updateAttemptOutcome } from "@/lib/mock/api";
-import type { AttemptOutcome } from "@/lib/types";
+import {
+  flagProblem,
+  getProblem,
+  recordAttempt,
+  updateAttemptErrorKind,
+  updateAttemptOutcome,
+} from "@/lib/mock/api";
+import type { AttemptOutcome, ErrorKind } from "@/lib/types";
 
 export interface SubmissionResult {
   attemptId: string;
@@ -77,5 +83,30 @@ export async function confirmGrade(
 ): Promise<void> {
   await updateAttemptOutcome(attemptId, outcome);
   revalidatePath("/dashboard");
+  revalidatePath("/profile");
+}
+
+/**
+ * A flag needs to survive navigation and keep the problem in the practice
+ * queue, so it is written here rather than left as React state.
+ */
+export async function setFlag(
+  problemId: string,
+  flagged: boolean
+): Promise<void> {
+  await flagProblem(problemId, flagged);
+  revalidatePath("/dashboard");
+}
+
+/**
+ * The error-kind chip lives in the feedback panel, after submitAnswer has
+ * already recorded the attempt — this attaches it to that same attempt so
+ * "Where it goes wrong" reflects marks made on live, not just seeded, misses.
+ */
+export async function setAttemptErrorKind(
+  attemptId: string,
+  errorKind: ErrorKind
+): Promise<void> {
+  await updateAttemptErrorKind(attemptId, errorKind);
   revalidatePath("/profile");
 }

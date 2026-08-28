@@ -9,6 +9,7 @@ import type {
   ErrorKind,
   MasteryCell,
   Problem,
+  ProblemStatus,
   ProfileData,
   QueueSpec,
   ReviewItem,
@@ -188,8 +189,59 @@ export async function getMockNow(): Promise<string> {
   return now().toISOString();
 }
 
+/** Live overlay, seeded from whichever fixtures start out flagged. A flag is
+ *  independent of grading, so it is tracked separately rather than folded
+ *  into the attempt stream. */
+const flaggedIds = new Set(
+  problems.filter((p) => p.status === "flagged").map((p) => p.id)
+);
+
+export async function flagProblem(
+  problemId: string,
+  flagged: boolean
+): Promise<void> {
+  if (flagged) flaggedIds.add(problemId);
+  else flaggedIds.delete(problemId);
+}
+
+export async function updateAttemptErrorKind(
+  attemptId: string,
+  errorKind: ErrorKind
+): Promise<void> {
+  const attempt = attempts.find((a) => a.id === attemptId);
+  if (attempt) attempt.errorKind = errorKind;
+}
+
 function isScored(a: Attempt) {
   return a.outcome !== "skipped";
+}
+
+/** Flagged wins over grading — you flagged it on purpose. Otherwise the most
+ *  recent *scored* attempt decides (a skip is not a verdict on the problem),
+ *  and no scored attempt at all means it has not really been tried yet. */
+function derivedStatus(problemId: string): ProblemStatus {
+  if (flaggedIds.has(problemId)) return "flagged";
+
+  // `attempts` is always append-ordered chronologically — the seeded
+  // backfill is generated oldest-first, and live attempts are pushed with a
+  // monotonic clock — so the last matching entry is the latest one. Two
+  // attempts can land in the same millisecond (submit, then immediately
+  // retry), where a plain `.at` comparison would silently keep whichever
+  // was inserted first instead of the true latest; taking the last array
+  // match sidesteps that entirely.
+  let latest: Attempt | null = null;
+  for (const a of attempts) {
+    if (a.problemId !== problemId || !isScored(a)) continue;
+    latest = a;
+  }
+  if (!latest) return "unattempted";
+  return latest.outcome === "correct" ? "mastered" : "missed";
+}
+
+/** Every read of a Problem's status should go through here, not the static
+ *  fixture value — this is the only place `status` is computed live. */
+function withEffectiveStatus(problem: Problem): Problem {
+  return { ...problem, status: derivedStatus(problem.id) };
 }
 
 function accuracyOf(list: Attempt[]) {
@@ -292,7 +344,9 @@ export async function getDashboard(): Promise<DashboardData> {
 
   // Drawn from the same filter that /solve uses, so the dashboard count and
   // the session position cannot disagree.
-  const queue = problems.filter((p) => PRACTICE_STATUSES.includes(p.status));
+  const queue = problems.filter((p) =>
+    PRACTICE_STATUSES.includes(derivedStatus(p.id))
+  );
 
   const recentSolved: SolvedItem[] = [...attempts]
     .sort((a, b) => (a.at < b.at ? 1 : -1))
@@ -321,7 +375,8 @@ export async function getDashboard(): Promise<DashboardData> {
       // Skips are not solves, so they are excluded from both figures.
       solved: attempts.filter(isScored).length,
       accuracy: accuracyOf(attempts),
-      mastered: problems.filter((p) => p.status === "mastered").length,
+      mastered: problems.filter((p) => derivedStatus(p.id) === "mastered")
+        .length,
     },
     recentSolved,
     summary: {
@@ -345,20 +400,23 @@ export async function getStreak(): Promise<number> {
 }
 
 export async function getProblem(id: string): Promise<Problem | null> {
-  return problems.find((p) => p.id === id) ?? null;
+  const problem = problems.find((p) => p.id === id);
+  return problem ? withEffectiveStatus(problem) : null;
 }
 
 export async function getQueue(spec: Partial<QueueSpec>): Promise<Problem[]> {
-  return problems.filter((p) => {
-    if (spec.textbookIds?.length && !spec.textbookIds.includes(p.source.textbookId))
-      return false;
-    if (spec.topicIds?.length && !spec.topicIds.includes(p.topicId)) return false;
-    if (spec.kinds?.length && !spec.kinds.includes(p.kind)) return false;
-    if (spec.difficulties?.length && !spec.difficulties.includes(p.difficulty))
-      return false;
-    if (spec.statuses?.length && !spec.statuses.includes(p.status)) return false;
-    return true;
-  });
+  return problems
+    .map(withEffectiveStatus)
+    .filter((p) => {
+      if (spec.textbookIds?.length && !spec.textbookIds.includes(p.source.textbookId))
+        return false;
+      if (spec.topicIds?.length && !spec.topicIds.includes(p.topicId)) return false;
+      if (spec.kinds?.length && !spec.kinds.includes(p.kind)) return false;
+      if (spec.difficulties?.length && !spec.difficulties.includes(p.difficulty))
+        return false;
+      if (spec.statuses?.length && !spec.statuses.includes(p.status)) return false;
+      return true;
+    });
 }
 
 export async function getAnalytics(
