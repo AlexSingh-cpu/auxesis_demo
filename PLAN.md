@@ -170,7 +170,7 @@ The spoiler rule is the product's core promise and has no guard at all today.*
   `acceptedAnswers`, `workedSolution`, `tags`, `subtopic`, or `source`. Write
   this as a key-set assertion so a newly added secret field fails the test.
 
-### 3. Record attempts
+### 3. Record attempts — done (`92b7abe`)
 
 *Rationale: the single change that makes the app feel finished. Everything that
 currently looks dead after you solve is downstream of this.*
@@ -178,16 +178,32 @@ currently looks dead after you solve is downstream of this.*
 - Move the seeded array into a mutable module-level store the existing getters
   already read. Keep `getDashboard`, `getQueue`, `getProblem`, `getAnalytics`,
   `getProfileData`, and `getStreak` signatures **unchanged**.
-- Extend `submitAnswer` to accept `seconds` and optional `errorKind`, and to
-  append an `Attempt` after grading.
+- Extend `submitAnswer` to accept `seconds` and append an `Attempt` after
+  grading. `errorKind` turned out not to belong on this call: the chip that
+  sets it only appears in the feedback panel *after* `submitAnswer` returns,
+  so there was nothing to pass yet. Its persistence stays step 4's job.
 - Revalidate `/dashboard` and `/profile` so the ribbon, recent list, lifetime
   stats, and charts update without a hard reload.
 - Proofs need a second write: the first response is `partial` + `selfGraded`,
   and "I got this" / "I missed it" must overwrite that attempt via a small
   `confirmGrade` action rather than only changing React state.
+- Resolved in passing, because it broke the "done when" check below: the mock
+  clock split flagged in Risks. A live attempt stamped with the real wall
+  clock would count toward `attempted` in every windowed range (no upper
+  bound on the filter) but never extend the streak (`computeStreak` walks
+  backward from `REFERENCE_DATE` and never looks forward past it) — so
+  answering correctly today wouldn't show up as a longer streak. Fixed with
+  a `now()` in `lib/mock/api.ts` that ticks forward from real elapsed time
+  but is offset to start at `REFERENCE_DATE`, so live attempts land on the
+  same mock "today" every other calculation already assumes. `buildAttempts`
+  keeps using the raw `REFERENCE_DATE` instant, so historical charts still
+  never drift.
 
 **Done when:** submit a wrong numeric answer, return to `/dashboard`, and see a
 new ember tick plus a new row; open Profile and see attempted increment.
+Verified via `lib/mock/api.test.ts` against the real store (not mocked) —
+browser-level click-through wasn't possible in this environment (no browser
+automation tool available), so that remains a manual check before shipping.
 
 ### 4. Persist flags, error kinds, and skips
 
@@ -317,16 +333,21 @@ Noted, not planned here.
 
 ## 5. Risks, inconsistencies, and open questions
 
-**The mock clock is split, and it drifts.** History is anchored to
-`REFERENCE_DATE` (2026-08-25), but `app/(app)/dashboard/page.tsx` passes
-`now={new Date().toISOString()}` to `RecentSolved`. Today that is a one-day
-skew; it widens every day the project sits. Once step 3 stamps new attempts with
-real timestamps, live rows and seeded rows will sit on two different clocks and
-the streak calculation — which counts back from `REFERENCE_DATE` — may show a
-gap. *Recommendation:* a single `now()` in the mock layer used by both the
-dashboard and new attempts. *Open question:* should the mock clock stay pinned
-to `REFERENCE_DATE` (stable charts, slightly fictional "now"), or advance with
-real time (honest relative labels, drifting seeded history)?
+**The mock clock split — resolved for live attempts, in `92b7abe`.** `lib/mock/api.ts`
+now exports `now()`: real elapsed time since the module loaded, offset to start
+at `REFERENCE_DATE`. Live attempts are stamped with it, `getMockNow()` exposes
+it to the dashboard's `RecentSolved`, and `buildAttempts`' seeded backfill still
+uses the raw `REFERENCE_DATE` instant untouched. This picked the "stay pinned"
+side of the open question below — deliberately, since a session running for
+minutes to hours never crosses a day boundary, so every `REFERENCE_DATE`-anchored
+range/streak calculation stays correct with zero changes to that math, and
+historical charts still never drift between renders. The bigger question is
+still open, just smaller now: **once a dev server has been up for a full day**,
+`now()` will cross into "tomorrow" relative to `REFERENCE_DATE`, at which point
+live attempts start landing on a mock day the seeded history never reaches.
+Harmless for a dev/demo session; would need real revisiting alongside step 6
+(auth/database), where "now" should just be real time and this whole shim goes
+away.
 
 **`topicId` reaches the client pre-submit.** `toSolveProblem` includes it. Topic
 is coarser than subtopic, so this is defensible, but it is a small crack in an
