@@ -1,12 +1,42 @@
 # Margin — Frontend Completion Plan
 
-Written 2026-08-26. Planning pass only; no code was changed to produce this.
+Written 2026-08-26 as a planning pass. **Status updated 2026-08-27** — steps 1–5
+and engagement items 1–5 and 7 have shipped since; each is marked below with its
+commit. Sections 1–2 describe the codebase as it was *before* that work and are
+kept as the historical baseline; `OVERVIEW.md` is the current-state snapshot.
 
 Scope: finish the **frontend**. Backend work (auth, a real database, OCR/vision
 parsing, multi-user isolation) is catalogued at the end and deliberately
 deferred. Where this plan touches the data layer it does so through the mock
 API's existing async signatures, so a real backend can replace it later without
 rewriting screens.
+
+---
+
+## 0. Status at a glance
+
+| Track | Done | Remaining |
+| --- | --- | --- |
+| **Core plan** (§3) | 1 · 2 · 3 · 4 · 5 | **6** upload review · **7** empty states · **8** consistency polish |
+| **Engagement** (§3a) | 1 · 2 · 3 · 4 · 5 · 7 | **6** staged reveal · **8** timer toggle · **9** mobile notes · **10** session recap |
+| **Backend** (§4) | — | auth · database · real ingestion · worked solutions |
+
+**Gates, all currently green:** `npx tsc --noEmit`, `npm run lint`, `npm test`
+(39 tests, 4 files), plus `npm run build` succeeds.
+
+**What changed structurally.** The app no longer "displays history it never
+records" — that was the central finding of both the original plan and the
+engagement analysis, and it is resolved. Submitting, flagging, skipping, and
+self-diagnosing a miss all persist; `Problem.status` is derived from real
+attempt history. What remains is mostly *surface*: the two biggest open items
+(§3a items 6 and 10) are both about the app having no emotional peak and no
+ending, which is the one structural finding from `ENGAGEMENT_ANALYSIS.md` still
+entirely untouched.
+
+**The single highest-value next thing** is the session recap (§3a item 10). It
+was gated on attempt persistence, which now exists, so it is unblocked — and
+`ENGAGEMENT_ANALYSIS.md` §3.2 rates it the highest single-item impact in the
+document.
 
 ---
 
@@ -300,32 +330,42 @@ experience reads as flat in retrospect. Gamification mechanics that would
 contradict the product's "diagnostic, not trophy case" philosophy (XP, levels,
 badges, leaderboards, streak-shaming) were explicitly considered and rejected.
 
-**Independent of persistence — buildable now, against mock data:**
+### Done
+
+| # | Change | Shipped in |
+| --- | --- | --- |
+| 1 | Zero-decision start path: an always-enabled "Start practice" bar above the filter panel, filters demoted to "Or, choose what to work on" | `7811ff6` |
+| 2 | Surface `queuedCount` on the dashboard — it was computed on every load and rendered nowhere | `7811ff6` |
+| 3 | Name the spoiler rule in the UI, near the citation on solve, for the first few problems only | `7811ff6` |
+| 4 | Three copy fixes so the app stops talking about itself ("your analytics", "the backend") at moments it should be talking to the student | `7811ff6` |
+| 5 | Streak visible below the `lg` breakpoint, abbreviated to fit the mobile header | `7811ff6` |
+| 7 | Don't hard-require the error kind inline — kept one-tap and optional, `Enter` still advances without it | `679c5c4` |
+
+Item 7 landed as *immediate* persistence on pick rather than batching into the
+recap, since the recap didn't exist yet and gating a real diagnostic feature on
+unbuilt future work wasn't worth it. Same data on the attempt either way.
+
+### Remaining
 
 | # | Change | Effort | Rationale |
 | --- | --- | --- | --- |
-| 1 | Zero-decision start path: an always-enabled "Start where I left off" above the filter panel; demote filters to "or choose what to work on" | ~30 min | The no-filter path already works (`lib/queue.ts:86`); nothing tells the user. Removes a configuration decision from the front of every session. |
-| 2 | Surface `queuedCount` on the dashboard | ~15 min | `getDashboard()` already computes it (`lib/mock/api.ts:278`) and it is rendered nowhere. Goal-gradient signal already paid for. |
-| 3 | Name the spoiler rule in the UI, once, near the citation on solve | ~15 min | The product's differentiator is documented only in the README. Invisible features read as missing metadata, not deliberate pedagogy. |
-| 4 | Three copy fixes: `feedback.tsx:86`, `upload-panel.tsx:110`, `:111` | ~15 min | The only three places copy slips into product/engineering vocabulary instead of speaking to the student. |
-| 5 | Streak visible on mobile — `top-bar.tsx:24` is `hidden ... lg:flex` | ~10 min | The only persistent retention artifact is currently desktop-only. |
-| 6 | Stage the feedback reveal (outcome → answer → classification, ~120ms stagger) and mark a correct difficulty 4–5 answer distinctly (accent border, firmer spring) | ~1–2 h | Creates the app's only emotional peak. The classification reveal is the one genuine variable reward and currently renders as a flat metadata footer. |
+| 10 | **Session recap** at queue completion: attempted, correct, median time, this-session ribbon, one derived next action, and a prompt for any miss still missing an error kind (some will, since the chip stays optional) | ~half day | Highest single-item impact in the analysis. "Finish" is still a bare navigation event — the most heavily weighted moment of the experience (peak-end rule) is nothing at all. **Was gated on step 3; that shipped, so this is now unblocked.** |
+| 6 | Stage the feedback reveal (outcome → answer → classification, ~120ms stagger) and mark a correct difficulty 4–5 answer distinctly (accent border, firmer spring) | ~1–2 h | Creates the app's only *other* emotional peak. The classification reveal is the one genuine variable reward and still renders as a flat metadata footer. |
+| 9 | Keep a condensed, collapsible problem statement visible in the mobile Notes tab (`solve-surface.tsx` hides it when `tab === "notes"`) | ~1 h | Notes are manipulation of the problem; hiding the source adds working-memory load exactly when the user is trying to offload it. |
 | 8 | Timer hide toggle, persisted next to `margin-solve-split` | ~45 min | Keep recording elapsed time; make displaying it optional. A count-up clock with no reference point can only make the user feel slow, and blocks flow on hard problems. |
-| 9 | Keep a condensed, collapsible problem statement visible in the mobile Notes tab (`solve-surface.tsx:269` currently hides it) | ~1 h | Notes are manipulation of the problem; hiding the source adds working-memory load exactly when the user is trying to offload it. |
 
-**Gated on step 3 (attempt persistence):**
+Reordered against the original list: 10 moved to the front now that its
+dependency has shipped, and it and 6 together are the whole of the "nothing is
+marked" structural finding.
 
-| # | Change | Effort | Rationale |
-| --- | --- | --- | --- |
-| 7 | See the amendment to step 4 above — do not hard-require the error kind inline | done, in `679c5c4` | Gating advance on self-diagnosis puts a compliance wall at the moment of lowest motivation, right after failure. Landed as immediate persistence on pick rather than batching, since the recap doesn't exist yet — same outcome, no wait on unbuilt work. |
-| 10 | Session recap screen at queue completion: attempted, correct, median time, this-session ribbon, one derived next action, and a prompt for any miss still missing an error kind (some will, since the chip stays optional) | ~half day | Highest single-item impact in the analysis, ranked last only on effort. "Finish" is currently a bare navigation event — the most heavily weighted moment of the experience (peak-end rule) is nothing at all. Needs real attempts to summarize. |
-
-**Also noted, not itemized above (see `ENGAGEMENT_ANALYSIS.md` for detail):**
+**Also noted, not itemized (see `ENGAGEMENT_ANALYSIS.md` for detail):**
 a starter problem set so new accounts don't land on a disabled primary button
-(§1.1); spaced-repetition due dates over the existing `readyToReview` data
-(§7.1) — the one mechanic where user retention and material retention are the
-same thing; an opt-in, self-scheduled daily reminder and exam-date awareness
-(§2.1, §7.2).
+(§1.1 — overlaps step 7 above); spaced-repetition due dates over the existing
+`readyToReview` data (§7.1) — the one mechanic where user retention and material
+retention are the same thing; an opt-in, self-scheduled daily reminder and
+exam-date awareness (§2.1, §7.2); an inline competence signal after submit
+(§4.2); the three *other* dashboard fields still computed and discarded —
+`summary`, `weakSpots`, `sessions` (§3.3, only `queuedCount` was surfaced).
 
 ---
 

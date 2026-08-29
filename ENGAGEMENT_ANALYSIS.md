@@ -27,6 +27,56 @@ because they change what to build *around* persistence once it lands.
 
 ---
 
+## Coverage — updated 2026-08-27
+
+The body of this document is preserved as written against the 2026-08-26
+codebase; present-tense claims below describe the app *at analysis time*, not
+today. This table is the running status. Sequencing lives in `PLAN.md` §3a.
+
+Of the **top-10 actionable items: 6 shipped, 4 remain.** But counting items
+understates one half and overstates the other, so weigh it by the two
+structural findings in the conclusion instead:
+
+| Structural finding | Status |
+| --- | --- |
+| **"Nothing accumulates"** — the investment stage of the habit loop is absent because persistence is absent | **Resolved.** `PLAN.md` steps 3–4. Attempts, flags, error-kind self-diagnosis, and skips all persist; `Problem.status` derives from real history. |
+| **"Nothing is marked"** — no peak, no ending; uniformly calm across success, failure, and completion | **Untouched.** Items 6 and 10 are exactly this, and both remain. |
+
+Section-by-section:
+
+| § | Finding | Status |
+| --- | --- | --- |
+| 1.1 | Cold start dead-ends on a *disabled* primary button | Open — needs a starter problem set (overlaps `PLAN.md` step 7) |
+| 1.2 | The spoiler rule is never explained in the UI | **Done** (item 3, `7811ff6`) |
+| 1.3 | Time-to-aha is long | Partly — the path shortened (item 1), but 1.1 still gates a genuine new account |
+| 2.1 | No external triggers; streak was desktop-only | Partly — streak now shows on mobile (item 5). Exam-date / opt-in reminders still open |
+| 2.2 | Configuration stands in front of the core action | **Done** (item 1, `7811ff6`) |
+| 2.3 | The one genuine variable reward is under-dramatized | Open (item 6) |
+| 2.4 | Every investment mechanism evaporates | **Done** (`PLAN.md` steps 3–4) — the single largest fix in the document |
+| 3.1 | A correct answer looks exactly like a wrong one | Open (item 6) |
+| 3.2 | The end of a session is nothing at all | Open (item 10) — highest single-item impact, now unblocked |
+| 3.3 | Four computed dashboard fields silently discarded | Partly — `queuedCount` surfaced (item 2); `summary`, `weakSpots`, `sessions` still unused |
+| 3.4 | Notes-save pop, timer with no reference point, unmarked streak milestones | Open (timer is item 8) |
+| 4.1 | Autonomy is excellent — preserve it | Preserved; no regressions introduced |
+| 4.2 | Competence signals live only on a page you must navigate to | Open — no inline post-submit mastery signal yet |
+| 4.3 | Relatedness entirely absent | Deferred by design — needs real multi-user data (backend phase) |
+| 5.1 | Configuration before action | **Done** (item 1) |
+| 5.2 | The timer is a flow risk | Open (item 8) |
+| 5.3 | The error-kind prompt interrupts at the worst moment | **Done** (item 7, `679c5c4`) — and it prevented a planned regression |
+| 5.4 | Mobile notes hide the problem | Open (item 9) |
+| 6.2 | Uniformly calm, including at its peaks | Open — items 6 + 10 together |
+| 6.3 | Blue-for-correct forgoes the reward colour | Acknowledged, no change; compensating via motion/copy per 3.1 |
+| 6.4 | Three places copy talks about the product, not to the student | **Done** (item 4, `7811ff6`) |
+| 7.1 | Spaced repetition is the honest retention mechanic | Open — `readyToReview` data exists, no due-date scheduling yet |
+| 7.2 | Nothing brings a user back tomorrow | Barely started — streak on mobile only; recap, review counts, reminders all open |
+
+The pattern: **the cheap, high-certainty items and the one big structural fix
+are done; what remains is the emotional layer** — the moments where the app
+should acknowledge that something happened. That is deliberate sequencing, not
+neglect: peaks built on data that didn't persist would have been decoration.
+
+---
+
 ## 1. First impressions & onboarding
 
 ### 1.1 There is no onboarding at all, and the cold start is a dead end

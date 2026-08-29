@@ -313,9 +313,28 @@ Worth stating plainly rather than leaving implicit:
 
 ---
 
-## 5. Everything traces back to one document
+## 5. What's next
+
+Short version, in order:
+
+1. **Session recap** at the end of a queue (`PLAN.md` §3a item 10). The
+   highest-impact single item identified in `ENGAGEMENT_ANALYSIS.md`, and it
+   was gated on attempt persistence — which now exists, so it's unblocked.
+   Right now "Finish" is a bare navigation event: the most memorable moment
+   of a study session is nothing at all.
+2. **Staged feedback reveal** (§3a item 6) — the other half of the same
+   structural gap. A correct answer currently looks identical to a wrong one.
+3. **Upload review step** (`PLAN.md` step 6) — the largest genuinely-missing
+   screen, and the only place the product's stated promise ("add problems
+   from the textbooks you own") is unmet.
+4. Then steps 7–8: reachable empty states, consistency polish.
+5. Then the backend phase: auth, database, real ingestion.
+
+## 6. Everything traces back to one document
 
 `PLAN.md` is the live source of truth for sequencing and rationale — every
 commit referenced above (`92b7abe`, `679c5c4`, `b71f1d3`, etc.) corresponds
-to a step there with its "done when" criteria and what was verified. This
-document is a snapshot; that one is the plan.
+to a step there with its "done when" criteria and what was verified. Its §0
+is the at-a-glance status table. `ENGAGEMENT_ANALYSIS.md` has a matching
+coverage table for the behavioral findings. This document is a snapshot;
+those are the plan and its scorecard.
