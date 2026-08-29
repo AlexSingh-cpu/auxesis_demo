@@ -2,7 +2,7 @@
 
 Written 2026-08-26 as a planning pass. **Status updated 2026-08-27** — steps 1–5
 and engagement items 1–5 and 7 have shipped since; each is marked below with its
-commit. Sections 1–2 describe the codebase as it was *before* that work and are
+commit. **§3b added 2026-08-28**: the next phase, drafted and approved. Sections 1–2 describe the codebase as it was *before* that work and are
 kept as the historical baseline; `OVERVIEW.md` is the current-state snapshot.
 
 Scope: finish the **frontend**. Backend work (auth, a real database, OCR/vision
@@ -33,10 +33,13 @@ attempt history. What remains is mostly *surface*: the two biggest open items
 ending, which is the one structural finding from `ENGAGEMENT_ANALYSIS.md` still
 entirely untouched.
 
-**The single highest-value next thing** is the session recap (§3a item 10). It
-was gated on attempt persistence, which now exists, so it is unblocked — and
-`ENGAGEMENT_ANALYSIS.md` §3.2 rates it the highest single-item impact in the
-document.
+**The next phase is §3b, "the session has an ending"** — engagement items 10,
+6, 8, and 9 plus the step 8 polish, drafted and approved 2026-08-28. It leads
+with the session recap, which was gated on attempt persistence, and that now
+exists; `ENGAGEMENT_ANALYSIS.md` §3.2 rates it the highest single-item impact
+in the document. Step 6 (upload review) is deliberately *not* next: it is the
+larger screen, but shipping it first would leave the session still ending on a
+bare navigation event.
 
 ---
 
@@ -356,7 +359,8 @@ unbuilt future work wasn't worth it. Same data on the attempt either way.
 
 Reordered against the original list: 10 moved to the front now that its
 dependency has shipped, and it and 6 together are the whole of the "nothing is
-marked" structural finding.
+marked" structural finding. **All four remaining items are sequenced and
+specified in §3b**, together with the step 8 polish.
 
 **Also noted, not itemized (see `ENGAGEMENT_ANALYSIS.md` for detail):**
 a starter problem set so new accounts don't land on a disabled primary button
@@ -366,6 +370,112 @@ retention are the same thing; an opt-in, self-scheduled daily reminder and
 exam-date awareness (§2.1, §7.2); an inline competence signal after submit
 (§4.2); the three *other* dashboard fields still computed and discarded —
 `summary`, `weakSpots`, `sessions` (§3.3, only `queuedCount` was surfaced).
+
+---
+
+## 3b. Next phase — "the session has an ending"
+
+Drafted and approved 2026-08-28, after steps 1–5 and engagement items 1–5 and 7.
+Scope: engagement items **10**, **6**, **8**, **9**, plus the **step 8** polish.
+Ordered so the anchor lands first — item 10 introduces the session concept the
+rest of the phase leans on; item 6 is the other emotional peak and touches
+`Feedback` alone; items 8 and 9 are independent and small; step 8 is unrelated
+correctness debt and must not block a feature.
+
+Everything below was grounded in a read of the shipped components, with file
+and line references given where a claim depends on current code.
+
+### 1. Session recap (item 10) — ~half a day
+
+*Rationale: "Finish" is currently `dashboardHref(params)`
+(`app/(app)/solve/[problemId]/page.tsx:47`) — a bare navigation event at the
+most heavily weighted moment of the experience. Highest single-item impact in
+`ENGAGEMENT_ANALYSIS.md` §3.2, and unblocked since step 3 shipped.*
+
+- **New route** `app/(app)/solve/recap/page.tsx`, a server component reading the
+  same queue spec from the URL, with a `loading.tsx` to match the sibling
+  routes. Static segments take precedence over dynamic ones in the App Router,
+  so `recap` is not shadowed by `[problemId]`; problem ids are prefixed, so no
+  id can collide with the literal string.
+- **`nextHref` becomes `recapHref(params)`** when `hasNext` is false. The button
+  keeps reading "Finish".
+- **Contents**, all derivable from fields already on `Attempt`: attempted,
+  correct, accuracy, median `seconds`, a this-session `AttemptRibbon` (reusing
+  `components/dashboard/attempt-ribbon.tsx`), and one derived next action — the
+  session's weakest topic, linked back into `/solve` with that topic filter
+  applied.
+- **Prompt for unclassified misses.** Item 7 deliberately kept the error-kind
+  chip optional inline, so some misses arrive here unclassified. The recap lists
+  exactly those and offers the same four chips, writing through the existing
+  `setAttemptErrorKind` action. This is the payoff for having kept it optional.
+- **New `getSessionRecap(spec)`** in `lib/mock/api.ts`, matching the async shape
+  of its neighbours so a real backend can replace it unchanged.
+
+**Session boundary — decided: a gap heuristic.** `SessionSummary`
+(`lib/types.ts:135`) is day-grained and cannot serve here. The recap selects
+live attempts back to the most recent gap longer than 30 minutes. This needs no
+new field on `Attempt`, no cookie, and survives a reload — and it sidesteps the
+fact that a server component cannot write a cookie during render. The rejected
+alternative was an explicit session id stamped at `/solve` entry: more precise,
+and the only option that correctly separates two back-to-back queues, but it
+costs a field on `Attempt` plus a server action fired on mount purely to start
+the clock. Revisit it alongside auth, where sessions become real.
+
+### 2. Staged feedback reveal (item 6) — ~1–2 h
+
+*Rationale: `Feedback` springs in as one block, so the classification tags — the
+app's only genuine variable reward — arrive as a flat metadata footer.*
+
+- Split the single `motion.div` into three staggered children at ~120ms:
+  outcome badge → answer/reference → classification.
+- Mark a correct answer at difficulty 4–5 distinctly (accent border, firmer
+  spring). `problem.difficulty` is already in scope at the call site.
+- **Resolves the reduced-motion open question in §5.** `Feedback` already calls
+  `useReducedMotion()` *and* the global CSS rule kills durations; staggering is
+  where those two mechanisms would actually conflict. With `reduce` true the
+  stagger collapses to zero — everything at once, no partial reveal.
+
+### 3. Timer visibility toggle (item 8) — ~45 min
+
+*Rationale: a count-up clock with no reference point can only make the user feel
+slow, and blocks flow on hard problems. Keep recording; make displaying it
+optional.*
+
+- `Timer` keeps `secondsRef` independent of render
+  (`components/solve/timer.tsx`), so hiding the display is genuinely cosmetic —
+  elapsed time still reaches `submitAnswer` untouched.
+- Toggle in the action bar, persisted to `localStorage` under
+  `margin-timer-hidden`, alongside the existing `margin-solve-split`.
+- Hidden means visually hidden only; the `aria-label` stays, so the value
+  remains available to a screen reader on request.
+
+### 4. Condensed problem in the mobile Notes tab (item 9) — ~1 h
+
+*Rationale: `solve-surface.tsx` hides the problem section entirely when
+`tab === "notes"`, adding working-memory load exactly when the user is trying to
+offload it.*
+
+- A collapsible condensed statement above `NotesPad`, `lg:hidden`, collapsed by
+  default with the citation always visible. Reuses the same `bodyHtml`, so there
+  is no second `MathHtml` mount cost beyond the markup and no change to the
+  spoiler boundary.
+
+### 5. Step 8 consistency polish — ~1 h
+
+- Route `RecentSolved` links through `solveHref` so they stop dropping the queue
+  query (`components/dashboard/recent-solved.tsx`).
+- Scope `hasActiveFilters` and the filters' `anyActive` check to `QUEUE_KEYS`, so
+  an unrelated search param never reads as a filter. Gets a unit test.
+- The mock-clock split is already resolved for live attempts in `92b7abe`; close
+  the item by updating the §5 note rather than reopening the design.
+
+### Testing and gates
+
+Vitest stays logic-only, per the phase scope: cover `getSessionRecap`'s boundary
+selection (including the empty-session case) and the `QUEUE_KEYS` scoping. The
+visual items — stagger, toggle, collapsible — have no logic worth unit-testing
+and get manual verification. Gates unchanged: `npx tsc --noEmit`,
+`npm run lint`, `npm test`, `npm run build`.
 
 ---
 
