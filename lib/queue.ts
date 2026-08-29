@@ -113,3 +113,10 @@ export function solveHref(problemId: string, params: SearchParams) {
 export function dashboardHref(params: SearchParams) {
   return `/dashboard${queueQuery(params)}`;
 }
+
+/** Finishing the queue goes to the recap, not straight back to the
+ *  dashboard, so filters still need to survive the trip — the recap's own
+ *  "keep going" action reads them back off this URL. */
+export function recapHref(params: SearchParams) {
+  return `/solve/recap${queueQuery(params)}`;
+}

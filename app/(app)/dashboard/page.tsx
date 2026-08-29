@@ -68,6 +68,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
               // The real Date() would put a freshly recorded attempt "2 days
               // ago" — attempts are stamped against the same mock clock.
               now={mockNow}
+              params={params}
             />
           ) : (
             <div className="p-5">

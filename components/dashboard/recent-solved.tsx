@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AttemptRibbon } from "@/components/dashboard/attempt-ribbon";
 import { OutcomeBadge } from "@/components/ui/stat";
+import { solveHref, type SearchParams } from "@/lib/queue";
 import type { Attempt, SolvedItem } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 
@@ -22,11 +23,15 @@ export function RecentSolved({
   attempts,
   solved,
   now,
+  params,
 }: {
   attempts: Attempt[];
   solved: SolvedItem[];
   /** Passed in rather than read here, so the server and client agree. */
   now: string;
+  /** Carries the dashboard's active filters into the solve session, same as
+   *  every other link out of this page. */
+  params: SearchParams;
 }) {
   const reference = new Date(now);
 
@@ -40,7 +45,7 @@ export function RecentSolved({
         {solved.map((item) => (
           <li key={item.attemptId} className="border-b border-line last:border-0">
             <Link
-              href={`/solve/${item.problemId}`}
+              href={solveHref(item.problemId, params)}
               className="flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-surface-2"
             >
               <OutcomeBadge outcome={item.outcome} />

@@ -13,6 +13,7 @@ import type {
   ProfileData,
   QueueSpec,
   ReviewItem,
+  SessionRecap,
   SessionSummary,
   SolvedItem,
   TimeBucket,
@@ -21,6 +22,7 @@ import type {
 } from "@/lib/types";
 import { citationOf } from "@/lib/citation";
 import { PRACTICE_STATUSES } from "@/lib/queue";
+import { selectSessionAttempts } from "@/lib/session";
 import { problems, profile, textbooks, topics } from "./fixtures";
 
 /** Anchored so generated history never drifts between renders. Replaced by real
@@ -397,6 +399,37 @@ export async function getDashboard(): Promise<DashboardData> {
 
 export async function getStreak(): Promise<number> {
   return computeStreak();
+}
+
+/** "live" keeps this out of the seeded a_NNNN id space — see recordAttempt.
+ *  Restricting to it here means the session boundary never has to reason
+ *  about the 70-day seeded backfill, which is generated dense enough that
+ *  two neighbouring entries can land under the 30-minute gap by chance. */
+function isLiveAttempt(a: Attempt) {
+  return a.id.startsWith("a_live_");
+}
+
+export async function getSessionRecap(): Promise<SessionRecap> {
+  const session = selectSessionAttempts(attempts.filter(isLiveAttempt));
+  const scored = session.filter(isScored);
+  const sortedSeconds = scored.map((a) => a.seconds).sort((a, b) => a - b);
+  const weakestTopic =
+    topicAccuracy(session).sort((a, b) => a.accuracy - b.accuracy)[0] ?? null;
+
+  return {
+    attempted: session.length,
+    correct: scored.filter((a) => a.outcome === "correct").length,
+    accuracy: accuracyOf(session),
+    medianSeconds:
+      sortedSeconds.length === 0
+        ? 0
+        : sortedSeconds[Math.floor(sortedSeconds.length / 2)],
+    attempts: session,
+    weakestTopic,
+    unclassifiedMisses: session.filter(
+      (a) => (a.outcome === "incorrect" || a.outcome === "partial") && !a.errorKind
+    ),
+  };
 }
 
 export async function getProblem(id: string): Promise<Problem | null> {

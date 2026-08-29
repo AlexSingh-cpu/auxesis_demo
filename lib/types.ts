@@ -132,6 +132,19 @@ export interface WeakSpot {
   attempted: number;
 }
 
+/** The trailing run of live attempts back to the most recent 30-minute gap
+ *  (see `selectSessionAttempts` in `lib/session.ts`), summarized for the
+ *  end-of-queue recap screen. */
+export interface SessionRecap {
+  attempted: number;
+  correct: number;
+  accuracy: number;
+  medianSeconds: number;
+  attempts: Attempt[];
+  weakestTopic: WeakSpot | null;
+  unclassifiedMisses: Attempt[];
+}
+
 export interface SessionSummary {
   date: string;
   attempted: number;

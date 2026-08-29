@@ -7,7 +7,7 @@ import { renderMathHtml } from "@/lib/math";
 import { textbooks } from "@/lib/mock/fixtures";
 import { citationOf } from "@/lib/citation";
 import { toSolveProblem } from "@/lib/problem";
-import { dashboardHref, parseQueueSpec, solveHref } from "@/lib/queue";
+import { parseQueueSpec, recapHref, solveHref } from "@/lib/queue";
 
 export async function generateMetadata(
   props: PageProps<"/solve/[problemId]">
@@ -44,8 +44,9 @@ export default async function SolveProblemPage(
       problem={toSolveProblem(problem)}
       bodyHtml={renderMathHtml(problem.body)}
       citation={citationOf(problem, textbook)}
-      // Finishing returns you to the dashboard with your filters intact.
-      nextHref={next ? solveHref(next.id, params) : dashboardHref(params)}
+      // Finishing goes to the session recap, with filters intact so its own
+      // "keep working on X" action can carry them forward.
+      nextHref={next ? solveHref(next.id, params) : recapHref(params)}
       hasNext={Boolean(next)}
       index={inQueue ? position + 1 : 1}
       total={inQueue ? queue.length : 1}

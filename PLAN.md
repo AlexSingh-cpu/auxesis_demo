@@ -2,8 +2,10 @@
 
 Written 2026-08-26 as a planning pass. **Status updated 2026-08-27** — steps 1–5
 and engagement items 1–5 and 7 have shipped since; each is marked below with its
-commit. **§3b added 2026-08-28**: the next phase, drafted and approved. Sections 1–2 describe the codebase as it was *before* that work and are
-kept as the historical baseline; `OVERVIEW.md` is the current-state snapshot.
+commit. **§3b shipped 2026-08-28** — the session-completion phase (engagement
+items 10, 6, 8, 9, plus step 8 polish). Sections 1–2 describe the codebase as
+it was *before* any of that work and are kept as the historical baseline;
+`OVERVIEW.md` is the current-state snapshot.
 
 Scope: finish the **frontend**. Backend work (auth, a real database, OCR/vision
 parsing, multi-user isolation) is catalogued at the end and deliberately
@@ -17,29 +19,33 @@ rewriting screens.
 
 | Track | Done | Remaining |
 | --- | --- | --- |
-| **Core plan** (§3) | 1 · 2 · 3 · 4 · 5 | **6** upload review · **7** empty states · **8** consistency polish |
-| **Engagement** (§3a) | 1 · 2 · 3 · 4 · 5 · 7 | **6** staged reveal · **8** timer toggle · **9** mobile notes · **10** session recap |
+| **Core plan** (§3) | 1 · 2 · 3 · 4 · 5 · 8 (via §3b) | **6** upload review · **7** empty states |
+| **Engagement** (§3a) | 1 · 2 · 3 · 4 · 5 · 6 · 7 · 8 · 9 · 10 | — |
+| **§3b — session-completion phase** | all 5 items | — |
 | **Backend** (§4) | — | auth · database · real ingestion · worked solutions |
 
 **Gates, all currently green:** `npx tsc --noEmit`, `npm run lint`, `npm test`
-(39 tests, 4 files), plus `npm run build` succeeds.
+(51 tests, 6 files), plus `npm run build` succeeds.
 
 **What changed structurally.** The app no longer "displays history it never
 records" — that was the central finding of both the original plan and the
 engagement analysis, and it is resolved. Submitting, flagging, skipping, and
 self-diagnosing a miss all persist; `Problem.status` is derived from real
-attempt history. What remains is mostly *surface*: the two biggest open items
-(§3a items 6 and 10) are both about the app having no emotional peak and no
-ending, which is the one structural finding from `ENGAGEMENT_ANALYSIS.md` still
-entirely untouched.
+attempt history. The other structural finding — no emotional peak and no
+ending — is also resolved as of §3b: the session recap and the staged
+feedback reveal are both shipped. What remains is the upload review screen
+(step 6) and reachable empty states (step 7); everything else in the frontend
+plan is done.
 
-**The next phase is §3b, "the session has an ending"** — engagement items 10,
-6, 8, and 9 plus the step 8 polish, drafted and approved 2026-08-28. It leads
-with the session recap, which was gated on attempt persistence, and that now
-exists; `ENGAGEMENT_ANALYSIS.md` §3.2 rates it the highest single-item impact
-in the document. Step 6 (upload review) is deliberately *not* next: it is the
-larger screen, but shipping it first would leave the session still ending on a
-bare navigation event.
+**§3b, "the session has an ending", shipped 2026-08-28** — engagement items 10,
+6, 8, and 9, plus the step 8 polish. `ENGAGEMENT_ANALYSIS.md` §3.2 rated the
+session recap the highest single-item impact in the document, and it now
+exists at `/solve/recap`, with the session boundary decided as a 30-minute
+gap heuristic (`lib/session.ts`). Finishing the queue is no longer a bare
+navigation event. **The single largest remaining item is step 6, upload
+review** — the only place the product promise ("add problems from your own
+textbooks") is still unmet; step 7 (reachable empty states) is the other
+open piece of the core plan.
 
 ---
 
@@ -343,24 +349,20 @@ badges, leaderboards, streak-shaming) were explicitly considered and rejected.
 | 4 | Three copy fixes so the app stops talking about itself ("your analytics", "the backend") at moments it should be talking to the student | `7811ff6` |
 | 5 | Streak visible below the `lg` breakpoint, abbreviated to fit the mobile header | `7811ff6` |
 | 7 | Don't hard-require the error kind inline — kept one-tap and optional, `Enter` still advances without it | `679c5c4` |
+| 10 | **Session recap** at queue completion: attempted, correct, median time, this-session ribbon, one derived next action, and a prompt for any miss still missing an error kind | §3b |
+| 6 | Staged feedback reveal (outcome → answer → classification, ~120ms stagger), correct difficulty 4–5 marked distinctly | §3b |
+| 9 | Condensed, collapsible problem statement in the mobile Notes tab | §3b |
+| 8 | Timer hide toggle, persisted next to `margin-solve-split` | §3b |
 
 Item 7 landed as *immediate* persistence on pick rather than batching into the
 recap, since the recap didn't exist yet and gating a real diagnostic feature on
-unbuilt future work wasn't worth it. Same data on the attempt either way.
+unbuilt future work wasn't worth it. Same data on the attempt either way. Items
+10, 6, 9, and 8 are specified in full in §3b, including as-built notes where
+the implementation deviated from the original draft.
 
 ### Remaining
 
-| # | Change | Effort | Rationale |
-| --- | --- | --- | --- |
-| 10 | **Session recap** at queue completion: attempted, correct, median time, this-session ribbon, one derived next action, and a prompt for any miss still missing an error kind (some will, since the chip stays optional) | ~half day | Highest single-item impact in the analysis. "Finish" is still a bare navigation event — the most heavily weighted moment of the experience (peak-end rule) is nothing at all. **Was gated on step 3; that shipped, so this is now unblocked.** |
-| 6 | Stage the feedback reveal (outcome → answer → classification, ~120ms stagger) and mark a correct difficulty 4–5 answer distinctly (accent border, firmer spring) | ~1–2 h | Creates the app's only *other* emotional peak. The classification reveal is the one genuine variable reward and still renders as a flat metadata footer. |
-| 9 | Keep a condensed, collapsible problem statement visible in the mobile Notes tab (`solve-surface.tsx` hides it when `tab === "notes"`) | ~1 h | Notes are manipulation of the problem; hiding the source adds working-memory load exactly when the user is trying to offload it. |
-| 8 | Timer hide toggle, persisted next to `margin-solve-split` | ~45 min | Keep recording elapsed time; make displaying it optional. A count-up clock with no reference point can only make the user feel slow, and blocks flow on hard problems. |
-
-Reordered against the original list: 10 moved to the front now that its
-dependency has shipped, and it and 6 together are the whole of the "nothing is
-marked" structural finding. **All four remaining items are sequenced and
-specified in §3b**, together with the step 8 polish.
+None. All ten items from this list have shipped.
 
 **Also noted, not itemized (see `ENGAGEMENT_ANALYSIS.md` for detail):**
 a starter problem set so new accounts don't land on a disabled primary button
@@ -373,19 +375,20 @@ exam-date awareness (§2.1, §7.2); an inline competence signal after submit
 
 ---
 
-## 3b. Next phase — "the session has an ending"
+## 3b. "The session has an ending" — done
 
-Drafted and approved 2026-08-28, after steps 1–5 and engagement items 1–5 and 7.
-Scope: engagement items **10**, **6**, **8**, **9**, plus the **step 8** polish.
-Ordered so the anchor lands first — item 10 introduces the session concept the
-rest of the phase leans on; item 6 is the other emotional peak and touches
-`Feedback` alone; items 8 and 9 are independent and small; step 8 is unrelated
-correctness debt and must not block a feature.
+Drafted and approved 2026-08-28, shipped the same day. Scope: engagement items
+**10**, **6**, **8**, **9**, plus the **step 8** polish. Ordered so the anchor
+landed first — item 10 introduces the session concept the rest of the phase
+leans on; item 6 is the other emotional peak and touches `Feedback` alone;
+items 8 and 9 are independent and small; step 8 is unrelated correctness debt
+that didn't need to block a feature.
 
 Everything below was grounded in a read of the shipped components, with file
-and line references given where a claim depends on current code.
+and line references given where a claim depends on current code. Each item's
+as-built notes are appended where implementation deviated from the draft.
 
-### 1. Session recap (item 10) — ~half a day
+### 1. Session recap (item 10) — done
 
 *Rationale: "Finish" is currently `dashboardHref(params)`
 (`app/(app)/solve/[problemId]/page.tsx:47`) — a bare navigation event at the
@@ -421,7 +424,19 @@ and the only option that correctly separates two back-to-back queues, but it
 costs a field on `Attempt` plus a server action fired on mount purely to start
 the clock. Revisit it alongside auth, where sessions become real.
 
-### 2. Staged feedback reveal (item 6) — ~1–2 h
+**As built:** the boundary logic is a standalone pure function,
+`selectSessionAttempts` in `lib/session.ts`, covered by `lib/session.test.ts`
+(7 cases: empty input, same-session gaps, a cut at >30 min, a cut at exactly
+=30 min treated as still one session, order-independence, and a custom
+threshold). `getSessionRecap()` in `lib/mock/api.ts` filters to live attempts
+(the `a_live_` id prefix) before handing them to it, so the 70-day seeded
+backfill can never leak into a session by chance proximity. Covered end-to-end
+against the real store in `lib/mock/session-recap.test.ts`, same approach step
+3 used. The shared `ERROR_KINDS` list moved out of `Feedback` into
+`lib/error-kinds.ts` so the inline chip and the recap's classification prompt
+can't drift apart.
+
+### 2. Staged feedback reveal (item 6) — done
 
 *Rationale: `Feedback` springs in as one block, so the classification tags — the
 app's only genuine variable reward — arrive as a flat metadata footer.*
@@ -435,7 +450,7 @@ app's only genuine variable reward — arrive as a flat metadata footer.*
   where those two mechanisms would actually conflict. With `reduce` true the
   stagger collapses to zero — everything at once, no partial reveal.
 
-### 3. Timer visibility toggle (item 8) — ~45 min
+### 3. Timer visibility toggle (item 8) — done
 
 *Rationale: a count-up clock with no reference point can only make the user feel
 slow, and blocks flow on hard problems. Keep recording; make displaying it
@@ -447,9 +462,15 @@ optional.*
 - Toggle in the action bar, persisted to `localStorage` under
   `margin-timer-hidden`, alongside the existing `margin-solve-split`.
 - Hidden means visually hidden only; the `aria-label` stays, so the value
-  remains available to a screen reader on request.
+  remains available to a screen reader on request (`sr-only`, not unmounted).
 
-### 4. Condensed problem in the mobile Notes tab (item 9) — ~1 h
+**As built:** reading the stored preference at mount hit the
+`react-hooks/set-state-in-effect` lint rule (setState inside an effect body),
+so it uses the same `useSyncExternalStore` pattern already established for the
+spoiler hint, extended with a small in-module pub-sub so a same-mount toggle
+click actually re-renders (the spoiler hint's `noopSubscribe` never needed to).
+
+### 4. Condensed problem in the mobile Notes tab (item 9) — done
 
 *Rationale: `solve-surface.tsx` hides the problem section entirely when
 `tab === "notes"`, adding working-memory load exactly when the user is trying to
@@ -460,14 +481,18 @@ offload it.*
   is no second `MathHtml` mount cost beyond the markup and no change to the
   spoiler boundary.
 
-### 5. Step 8 consistency polish — ~1 h
+### 5. Step 8 consistency polish — done
 
 - Route `RecentSolved` links through `solveHref` so they stop dropping the queue
   query (`components/dashboard/recent-solved.tsx`).
 - Scope `hasActiveFilters` and the filters' `anyActive` check to `QUEUE_KEYS`, so
   an unrelated search param never reads as a filter. Gets a unit test.
-- The mock-clock split is already resolved for live attempts in `92b7abe`; close
-  the item by updating the §5 note rather than reopening the design.
+- `hasActiveFilters` was already correctly scoped to `QUEUE_KEYS` (and already
+  tested); the unscoped check was `anyActive` in
+  `components/dashboard/practice-filters.tsx`, fixed the same way.
+- The mock-clock split is already resolved for live attempts in `92b7abe`; the
+  §5 note is accurate as written and needs no change beyond this line closing
+  the checklist item.
 
 ### Testing and gates
 

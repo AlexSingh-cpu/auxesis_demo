@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buttonStyles } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Select } from "@/components/ui/field";
+import { QUEUE_KEYS } from "@/lib/queue";
 import { cn, formatMinutes } from "@/lib/utils";
 
 export interface ChipOption {
@@ -119,7 +120,11 @@ export function PracticeFilters({
   const chosenIn = (key: string) =>
     new Set((params.get(key) ?? "").split(",").filter(Boolean));
 
-  const anyActive = [...params.keys()].length > 0;
+  // Scoped to the queue keys, so an unrelated search param never makes
+  // "Clear" appear when there is nothing of this panel's to clear.
+  const anyActive = Object.values(QUEUE_KEYS).some((key) =>
+    Boolean(params.get(key))
+  );
   const query = params.toString();
 
   return (

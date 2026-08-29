@@ -9,7 +9,12 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
-import { FlagIcon } from "@phosphor-icons/react";
+import {
+  CaretDownIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  FlagIcon,
+} from "@phosphor-icons/react";
 import {
   confirmGrade,
   setAttemptErrorKind,
@@ -33,6 +38,7 @@ const SPLIT_KEY = "margin-solve-split";
 const DEFAULT_SPLIT = "58%";
 const SPOILER_HINT_KEY = "margin-spoiler-hint-seen";
 const SPOILER_HINT_LIMIT = 3;
+const TIMER_HIDDEN_KEY = "margin-timer-hidden";
 
 /** No external event fires when the count changes, so nothing needs to
  *  subscribe: this mount's value only needs to be read once, up front. */
@@ -50,6 +56,78 @@ function getSpoilerHintSnapshot(): boolean {
 
 function getSpoilerHintServerSnapshot(): boolean {
   return false;
+}
+
+/** Unlike the spoiler hint, this value changes from a click during the same
+ *  mount, so a real (if tiny) pub-sub replaces the no-op subscribe above —
+ *  useSyncExternalStore still keeps the read out of an effect, avoiding the
+ *  cascading-render setState-in-effect the split divider and spoiler hint
+ *  both already sidestep. */
+let timerHiddenListeners: Array<() => void> = [];
+
+function subscribeTimerHidden(listener: () => void) {
+  timerHiddenListeners.push(listener);
+  return () => {
+    timerHiddenListeners = timerHiddenListeners.filter((l) => l !== listener);
+  };
+}
+
+function getTimerHiddenSnapshot(): boolean {
+  try {
+    return window.localStorage.getItem(TIMER_HIDDEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function getTimerHiddenServerSnapshot(): boolean {
+  return false;
+}
+
+/** Notes are manipulation of the problem, so hiding it entirely while typing
+ *  adds working-memory load exactly when the user is trying to offload it.
+ *  Collapsed by default and lg:hidden — the desktop two-pane layout already
+ *  keeps the problem visible in its own column, so this would only duplicate
+ *  it there. */
+function CondensedProblem({
+  bodyHtml,
+  citation,
+}: {
+  bodyHtml: string;
+  citation: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mb-4 flex flex-col gap-2 rounded-control border border-line bg-surface-2 p-3 lg:hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        aria-expanded={expanded}
+        className="flex items-center gap-2 text-left"
+      >
+        <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink-3">
+          {citation}
+        </span>
+        <span className="shrink-0 text-[12px] text-ink-3">
+          {expanded ? "Hide problem" : "Show problem"}
+        </span>
+        <CaretDownIcon
+          size={14}
+          className={cn(
+            "shrink-0 text-ink-3 transition-transform duration-150",
+            expanded && "rotate-180"
+          )}
+        />
+      </button>
+      {expanded ? (
+        <MathHtml
+          html={bodyHtml}
+          className="text-[15px] leading-[1.6] text-ink"
+        />
+      ) : null}
+    </div>
+  );
 }
 
 interface SolveSurfaceProps {
@@ -86,6 +164,11 @@ export function SolveSurface({
     noopSubscribe,
     getSpoilerHintSnapshot,
     getSpoilerHintServerSnapshot
+  );
+  const timerHidden = useSyncExternalStore(
+    subscribeTimerHidden,
+    getTimerHiddenSnapshot,
+    getTimerHiddenServerSnapshot
   );
 
   const splitRef = useRef<HTMLDivElement>(null);
@@ -131,6 +214,16 @@ export function SolveSurface({
       void setFlag(problem.id, next);
     });
   }, [flagged, problem.id]);
+
+  const toggleTimerHidden = useCallback(() => {
+    const next = !getTimerHiddenSnapshot();
+    try {
+      window.localStorage.setItem(TIMER_HIDDEN_KEY, next ? "1" : "0");
+    } catch {
+      // Preference simply is not remembered.
+    }
+    for (const listener of timerHiddenListeners) listener();
+  }, []);
 
   // Restore the divider position without a render pass.
   useEffect(() => {
@@ -257,6 +350,7 @@ export function SolveSurface({
           chapterTitle={result.chapterTitle}
           tags={result.tags}
           outcome={outcome}
+          difficulty={problem.difficulty}
           selfGraded={selfGraded}
           errorKind={errorKind}
           onErrorKind={(kind) => {
@@ -369,6 +463,7 @@ export function SolveSurface({
           style={{ gridArea: "notes" }}
           className={cn("flex flex-col lg:pl-4", tab === "problem" ? "hidden lg:flex" : "flex")}
         >
+          <CondensedProblem bodyHtml={bodyHtml} citation={citation} />
           <NotesPad
             problemId={problem.id}
             className={tab === "notes" ? "min-h-[50vh] lg:min-h-0" : undefined}
@@ -383,7 +478,19 @@ export function SolveSurface({
           "bg-bg/95 px-4 py-3 backdrop-blur-md md:bottom-0 md:mx-0 md:rounded-control md:border md:px-4"
         )}
       >
-        <Timer ref={timerRef} running={!submitted} />
+        <div className="flex items-center gap-1.5">
+          <Timer ref={timerRef} running={!submitted} hidden={timerHidden} />
+          <IconButton
+            label={timerHidden ? "Show timer" : "Hide timer"}
+            onClick={toggleTimerHidden}
+          >
+            {timerHidden ? (
+              <EyeSlashIcon size={16} />
+            ) : (
+              <EyeIcon size={16} />
+            )}
+          </IconButton>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={skip}>
             Skip
